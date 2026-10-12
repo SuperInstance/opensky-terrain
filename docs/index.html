@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenSky Terrain — Bathymetric Region Packs</title>
+<meta name="description" content="A data standard and verified reference toolchain that turns crowdsourced boat soundings into game-ready bathymetric terrain tiles with honest, fathom-true contours. Sitka Sound, Alaska.">
+<style>
+  :root{
+    --bg:#0a1620; --bg2:#0e1f2e; --panel:#10293d; --line:#1e4258;
+    --ink:#dcecf5; --dim:#8fb2c6; --accent:#57c7e3; --good:#5fd68a;
+    --warn:#e8b34b; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);
+    color:var(--ink);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:880px;margin:0 auto;padding:0 20px 64px}
+  header{padding:56px 0 8px}
+  .kicker{color:var(--accent);font-family:var(--mono);font-size:13px;letter-spacing:.18em;text-transform:uppercase}
+  h1{font-size:44px;line-height:1.1;margin:10px 0 12px}
+  h2{font-size:24px;margin:44px 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px}
+  .lede{font-size:19px;color:var(--dim);max-width:46em}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:22px 0 4px}
+  .chip{font-family:var(--mono);font-size:12.5px;border:1px solid var(--line);
+    background:var(--panel);border-radius:999px;padding:4px 12px;color:var(--ink)}
+  .chip b{color:var(--good);font-weight:600}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin:18px 0}
+  .panel.finding{border-left:4px solid var(--warn)}
+  .panel b.big{font-size:19px}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:15px}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-weight:600}
+  td.num{font-family:var(--mono);white-space:nowrap}
+  code{font-family:var(--mono);background:#0a1a28;border:1px solid var(--line);
+    border-radius:5px;padding:1px 6px;font-size:14px}
+  pre{background:#071420;border:1px solid var(--line);border-radius:10px;
+    padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:14px;line-height:1.55}
+  .pipe{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .step .n{font-family:var(--mono);color:var(--accent);font-size:12px;letter-spacing:.12em}
+  .step .t{font-weight:600;display:block;margin:4px 0}
+  .step .d{color:var(--dim);font-size:13.5px}
+  a{color:var(--accent)}
+  ul{padding-left:22px}
+  li{margin:5px 0}
+  footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);color:var(--dim);font-size:13.5px}
+  .muted{color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">SuperInstance</div>
+  <h1>OpenSky Terrain</h1>
+  <p class="lede">A data standard and a verified reference toolchain that turns
+  crowdsourced boat soundings into game-ready bathymetric terrain tiles —
+  with contours a fisherman can trust to the fathom. Built for
+  OpenSkyFlight-class Three.js platforms, around Sitka Sound, Alaska.</p>
+  <div class="chips">
+    <span class="chip">Spec <b>v0.1 + v0.2 amendments</b></span>
+    <span class="chip">Verification suite <b>10 / 10</b></span>
+    <span class="chip">Reference code <b>Python + TypeScript</b></span>
+    <span class="chip">three-tile loader spike <b>PASS</b></span>
+  </div>
+</header>
+
+<h2>The finding that started it</h2>
+<div class="panel finding">
+  <b class="big">Sitka's tide station is 9451600.</b>
+  <p>A widely copied research pack called NOAA station <code>9452210</code>
+  “Sitka” in its spec, its generator, its ground truth, and all four of its
+  audit implementations. That station is <b>Juneau</b>. Sitka is
+  <code>9451600</code>; the number in the pack's bake memo, <code>9451054</code>,
+  is Port Alexander. Three station IDs, three different harbours — and every
+  tide correction downstream of the wrong one is silently wrong with it.
+  Verified against the NOAA/NCEI CO-OPS station tables; the corrections are
+  published in this repository.</p>
+</div>
+
+<h2>And the plateau that wasn't the algorithms' fault</h2>
+<p>Four independent tide-correction implementations plateaued at
+≈&nbsp;0.40&nbsp;fathoms of disagreement on a test shoal. The cause was not
+the math. The synthetic tide table ended at 23:54 while the sounding tracks
+ran to 03:37 — and the interpolator <i>silently clamped</i> ~300 out-of-range
+soundings to the last tide value. The fix is an invariant, now written into
+the spec: <b>tide tables must cover the full timestamp range of every
+sounding file; never clamp — exclude and flag.</b></p>
+
+<h2>Verified results</h2>
+<p class="muted">Every number below is reproduced by one command —
+<code>python checks/run_all.py</code> — against known ground truth.</p>
+<table>
+  <tr><th>Measurement</th><th>Result</th></tr>
+  <tr><td>Tide coefficient recovery (joint least squares)</td><td class="num">0.9984 vs truth 1.0</td></tr>
+  <tr><td>Test shoal disagreement, raw → corrected</td><td class="num">0.996 → 0.203 fm</td></tr>
+  <tr><td>Corrected soundings archived as COPC/LAZ</td><td class="num">21.7× vs XYZ</td></tr>
+  <tr><td>Synthetic Region Pack</td><td class="num">22 tiles · 4 LOD levels · 1.35 MB</td></tr>
+  <tr><td>Per-tile decode verification at bake time</td><td class="num">22 / 22 tiles</td></tr>
+  <tr><td>Cross-language format proof (Python encode → TypeScript decode)</td><td class="num">exact match</td></tr>
+  <tr><td>three-tile loader spike (upstream three-tile 0.12.2)</td><td class="num">geometry + both extensions land</td></tr>
+</table>
+
+<h2>The pipeline</h2>
+<div class="pipe">
+  <div class="step"><span class="n">STAGE 1</span><span class="t">CSB correction</span>
+    <span class="d">Joint fit: one shared tide coefficient + per-vessel transducer offsets, fitted — never sign-assumed.</span></div>
+  <div class="step"><span class="n">STAGE 2</span><span class="t">COPC archive</span>
+    <span class="d">Corrected soundings stored as COPC/LAZ at ~20× compression, WGS84 in / out.</span></div>
+  <div class="step"><span class="n">STAGE 3</span><span class="t">Fusion grid</span>
+    <span class="d">Survey preferred, fleet second, gaps interpolated — every cell carries its source.</span></div>
+  <div class="step"><span class="n">STAGE 4</span><span class="t">Tile bake</span>
+    <span class="d">Quantized-mesh tiles in a local ENU frame, per-vertex bottom-type (ext 5) and confidence (ext 6).</span></div>
+  <div class="step"><span class="n">STAGE 5</span><span class="t">Runtime</span>
+    <span class="d">TypeScript decoder + LOD selector bind contour intervals to honest mesh error. Runtime owns the tide.</span></div>
+</div>
+
+<h2>Format decisions</h2>
+<ul>
+  <li><b>Quantized-mesh-1.0 over Terrarium PNG</b> — per-vertex data carriage, true triangulation, LOD error binding.</li>
+  <li><b>Local ENU frame per pack</b> — Web Mercator rejected at 57°N; meters inside, fathoms on display.</li>
+  <li><b>Bake is static MLLW seafloor</b> — exaggeration is render-only and can never leak into physics.</li>
+  <li><b>Decoders must skip unknown extensions by length</b> — a widely used NASA loader was source-verified to break on them; ours doesn't.</li>
+</ul>
+
+<h2>Run the receipts</h2>
+<pre>git clone https://github.com/SuperInstance/opensky-terrain
+cd opensky-terrain
+python checks/run_all.py        # 10 passed, 0 failed</pre>
+<p>Requires Python 3.11+ (numpy, pandas) and Node 22+. The COPC check uses a
+PDAL binary when present and skips cleanly without one.</p>
+
+<h2>Status</h2>
+<p>Specification v0.1 with v0.2 amendments; reference implementations verified
+end-to-end on synthetic data. The first audit on real soundings awaits access
+to the local data machine — fleet data stays private, and only synthetic data
+is ever published here. One design question is still open, with the decision
+packet in the spec: pack extent vs a curved sea surface (at a 90×50&nbsp;km
+pack's corners, the earth falls 208&nbsp;m out from under a flat one).</p>
+
+<footer>
+  OpenSky Terrain — a SuperInstance project, built in the open.
+  Code: Apache-2.0. ·
+  <a href="https://github.com/SuperInstance/opensky-terrain">Repository</a> ·
+  <a href="https://github.com/SuperInstance/opensky-terrain/blob/main/spec/SPEC-v0.1.md">The spec</a> ·
+  <a href="https://github.com/Lucineer/OpenSkyFlight">OpenSkyFlight</a>
+</footer>
+
+</div>
+</body>
+</html>
