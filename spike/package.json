@@ -1,0 +1,9 @@
+{
+  "name": "opensky-terrain-spike",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "three": "0.183.1",
+    "three-tile": "^0.12.2"
+  }
+}

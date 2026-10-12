@@ -1,63 +1,74 @@
 # OpenSky Terrain
 
-A bathymetric game platform for Sitka Sound, Alaska. Real seafloor depth
-data — professional survey soundings plus depth tracks contributed by the
-local fishing fleet — is baked into self-contained "Region Packs" that a
-browser game renders as true-to-scale underwater terrain: a 10/5/2/1-fathom
-contour ladder, water you can be on or under, and camera modes for flying,
-boating, standing on deck, or piloting an AUV.
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-The programme forks OpenSkyFlight and keeps its terrain/water/contour
-machinery, replacing flight terrain with bathymetry referenced to MLLW
-(mean lower low water). A second region is a second pack, not a second
-codebase.
+## Overview
 
-## What's here
+OpenSky Terrain provides bathymetric Region Packs for OpenSky Flight-class 3D terrain platforms, focusing on Sitka Sound, Alaska. It establishes a data standard and a verified reference toolchain that transforms crowdsourced boat soundings (CSB) into game-ready bathymetric terrain tiles with accurate, fathom-true contours.
 
-- **DIGEST.md** — the programme digest: the design rounds, the agreed
-  architecture (region packs, ENU local tangent plane, tide handled at
-  runtime against a static MLLW bake), and the open decisions.
-- **VERIFICATION.md** — an independent verification pass over the source
-  pack's sounding-audit claims, with the corrections it produced.
-- **NEEDS-FROM-LOCAL.md** — the metadata-only inventory checklist to run
-  on the machine where the real data lives, before the first real audit.
-- **audit-kit/** — the lane's own tools: `prep_noaa_tide.py` (converts a
-  NOAA CO-OPS download into the audit's tide-table schema) and
-  `make_kit.py` (generates the patched audit kit), with the kit README.
+## Purpose
 
-## Headline verification result
+- **Data Standard**: Defines a standardized format for bathymetric data.
+- **Reference Toolchain**: Includes a verified pipeline that processes CSB into quantized-mesh tiles with per-vertex extensions for bottom-type and confidence.
+- **Accuracy**: Ensures honest, fathom-true contours verified against known ground truth.
 
-Checked against NOAA/NCEI station tables: **Sitka's tide station is
-9451600.** The source pack's audit spec, scripts, and ground truth all
-called 9452210 "Sitka" — 9452210 is Juneau. The bake memo's third
-candidate, 9451054, is Port Alexander. Every tide correction in the pack
-therefore hung off the wrong city's tide until this was caught.
+## The Tide-Station Trap
 
-All four of the pack's audit variants (four independent implementations
-of one audit spec, run on synthetic data with a known reference shoal)
-were independently re-run: **4/4 pass, corrected spreads reproduced
-digit-for-digit** (0.4046 / 0.4015 / 0.1957 / 0.4475 fathoms). Two latent
-defects were found in the scripts that would have bitten on the first
-real run — the reference shoal was hardcoded with no way to set it, and
-one variant fabricated tide values outside its table's range from the
-test generator's own sine wave. Both are fixed in the local kit; the
-patched copies also reproduce 4/4.
+A widely-copied research pack called NOAA station 9452210 "Sitka" — that station is Juneau. Sitka is 9451600; Port Alexander is 9451054 (all verified against NOAA/NCEI CO-OPS tables). The error was a catalyst for building a toolchain that verifies instead of copying.
 
-## What is not here
+## Verified Results
 
-- **The audit variant sources.** The four implementations were written by
-  a collaborator; the programme's licence decision is still pending, so
-  their code stays local for now. The verification results above stand
-  on their own.
-- **The original briefing pack.** The collaborator's memos and the
-  third-party source material pasted into it are not ours to publish.
-- **Real fleet data — none, ever.** Fleet soundings are private
-  (they chart working fishing spots). No real data appears in this
-  repository; everything verified so far ran on synthetic data.
+| Metric                          | Value          |
+|---------------------------------|----------------|
+| Tide coefficient recovery      | 0.9984 (vs 1.0) |
+| Test shoal disagreement        | 0.996 -> 0.203 fathoms |
+| Compression vs XYZ             | 21.7x          |
+| Synthetic Region Pack size     | 1.35 MB        |
+| LOD levels                      | 4              |
+| Tide table coverage invariant  | Full timestamp range required |
+
+## Key Features
+
+- **CSB Joint Least-Squares Corrector**: Recovers tide coefficients with high accuracy.
+- **Data Archiving**: Stores corrected soundings as COPC/LAZ with high compression.
+- **Tile Baking**: Converts data to quantized-mesh-1.0 format with local ENU coordinates and per-vertex extensions.
+- **LOD Selector**: Implements the contour-interval contract for efficient rendering.
+- **Tide Handling**: Bakes static MLLW seafloor; runtime manages tide effects.
+
+## Root Cause Analysis
+
+Four independent tide-correction implementations initially plateaued at ~0.40 fathoms of disagreement. The root cause was the tide table ending before the sounding tracks, causing the interpolator to silently clamp ~300 soundings. The solution is an invariant: tide tables must cover the full timestamp range; never clamp — exclude and flag.
+
+## Format Decisions
+
+- **Quantized-Mesh Over Terrarium PNG**: Allows for per-vertex data carriage, true triangulation, and LOD error binding.
+- **Local ENU Frame**: Chosen over Web Mercator due to its suitability at 57 degrees N.
+- **Coordinate System**: Uses meters internally and fathoms for display.
+- **Tide Management**: Bakes static MLLW seafloor; runtime manages tide effects.
 
 ## Status
 
-Design and verification are complete on synthetic data. The next step is
-the first real-data inventory on the local machine where the fleet data
-already lives (metadata and small samples only — the data does not move),
-followed by the first audit run against a real charted shoal.
+- **Specification**: v0.1 draft with verified reference implementations.
+- **Data Audit**: Pending access to the local data machine.
+- **Open Decisions**: 
+  - Pack extent vs curved sea surface.
+  - Licensing split (recommended Apache-2.0 for code, CC-BY-4.0 for data).
+
+## Repository Layout
+
+- **spec/** : The standard documentation.
+- **src/regionpack/** : Python reference toolchain.
+- **runtime/** : TypeScript decoder and LOD selector.
+- **examples/** : A minimal example pack whose reference tile is the conformance fixture for cross-language decode checks.
+- **spike/** : A three-tile loader spike: the upstream `three-tile` TileLoader serving Region Pack tiles (verified headless against three-tile 0.12.2 — geometry, height range, and both extension attributes land exactly).
+- **checks/** : One-command verification suite.
+- **audit-kit/** : Original four-variant audit kit and NOAA tide prep tool.
+
+## Audience
+
+This repository is aimed at engineers and the dad-and-kid workshop behind OpenSkyFlight. The tone is scientific and plain, with an emphasis on providing receipts over claims.
+
+## Quickstart
+
+Run the verification suite with:
+

@@ -1,0 +1,12 @@
+[project]
+name = "regionpack"
+version = "0.1.0"
+description = "Bathymetric Region Packs: CSB correction, quantized-mesh bake, conformance validation"
+requires-python = ">=3.11"
+dependencies = ["numpy", "pandas", "scipy"]
+
+[project.optional-dependencies]
+copc = []  # COPC stage shells out to a PDAL binary (PDAL_BIN)
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,105 @@
+{
+  "regionPackVersion": "0.1",
+  "region": {
+    "id": "sitka-sound",
+    "name": "Sitka Sound, Alaska"
+  },
+  "boundingBox": {
+    "crs": "EPSG:4326",
+    "west": -136.55,
+    "south": 56.94,
+    "east": -134.84,
+    "north": 58.44
+  },
+  "coordinateSystems": {
+    "storage": {
+      "crs": "EPSG:4326"
+    },
+    "runtime": {
+      "frame": "ENU",
+      "origin": {
+        "lat": 57.05,
+        "lon": -135.43
+      },
+      "units": "meters"
+    }
+  },
+  "verticalDatum": {
+    "name": "MLLW",
+    "units": "meters",
+    "station": "9451600"
+  },
+  "layers": {
+    "terrain": {
+      "format": "quantized-mesh-1.0",
+      "url": "tiles/{z}/{x}/{y}.terrain"
+    },
+    "extensionsSupported": [
+      "bathymetry-bottomtype",
+      "bathymetry-confidence"
+    ]
+  },
+  "confidence": {
+    "tiers": {
+      "proMultibeam": [
+        240,
+        255
+      ],
+      "fleet": [
+        80,
+        160
+      ],
+      "interpolated": [
+        0,
+        60
+      ]
+    }
+  },
+  "contourIntervalLodMap": {
+    "10": 18.288,
+    "5": 9.144,
+    "2": 3.6576,
+    "1": 1.8288
+  },
+  "contourIntervals": [
+    10,
+    5,
+    2,
+    1
+  ],
+  "defaultByCameraMode": {
+    "freeFly": 10,
+    "boat": 5,
+    "deck": 2,
+    "auv": 1
+  },
+  "verticalExaggeration": {
+    "default": 1.0,
+    "presets": {
+      "contourStudy": 2.0,
+      "flat": 4.0,
+      "navigation": 6.0
+    }
+  },
+  "sourceProvenance": [
+    {
+      "origin": "NOAA survey (placeholder entry)",
+      "confidence": "proMultibeam",
+      "licensing": "CC0"
+    },
+    {
+      "origin": "Fleet CSB soundings, tide+offset corrected",
+      "confidence": "fleet",
+      "licensing": "CC-BY-4.0"
+    }
+  ],
+  "license": {
+    "code": "Apache-2.0",
+    "data": "CC-BY-4.0"
+  },
+  "privacy": "public",
+  "versioning": {
+    "packVersion": "0.1.0-example",
+    "contentHash": "sha256:b24df608ae147a8176b6ff4c138718588bcbecf9d54785ce29f28978796ec724"
+  }
+}
