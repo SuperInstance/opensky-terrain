@@ -74,6 +74,21 @@ tide are as measured. The pacing is edited: long transits fold away, and
 the game keeps the exciting parts — which is easy, because the real
 thing is exciting enough.
 
+## Thin and thick instances
+
+The same world runs at different weights. The browser version is a
+thin client: it draws the quilt of tiles it is handed and asks little
+of the device — a phone, an iPad, anything can be a window. The thick
+instance lives on real hardware — a laptop with a GPU in it — where the
+full-resolution pack resides, the judgement model fits, the hundred
+rehearsals run, and new detail gets pre-figured. The pack format is the
+contract between them: the thick instance distils and publishes levels
+up; the thin one never computes what the thick one already knows.
+
+This is already true in miniature: the public site serves the overview
+levels of Sitka Sound to anyone, while the full 25 m pack — all 579
+tiles — stays on the local machine that baked it.
+
 ## The living layer: from depth to life
 
 Depth, in a place like Sitka Sound, is done — the charts are good enough
