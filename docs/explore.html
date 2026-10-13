@@ -389,7 +389,7 @@ addEventListener('mousemove', (e) => {
   mouseLast = { x: e.clientX, y: e.clientY };
 });
 addEventListener('mouseup', () => mouseLook = false);
-addEventListener('wheel', (e) => { state.camDist = THREE.MathUtils.clamp(state.camDist + e.deltaY * 0.02, 4, 30); }, { passive: true });
+addEventListener('wheel', (e) => { state.camDist = THREE.MathUtils.clamp(state.camDist + e.deltaY * 0.05, 4, 150); }, { passive: true });
 for (const [id, v] of [['btnUp', 1], ['btnDown', -1]]) {
   const el = document.getElementById(id);
   el.addEventListener('touchstart', (e) => { touchVert = v; e.preventDefault(); }, { passive: false });
@@ -577,7 +577,7 @@ function animate() {
   }
   const f = fwdOf(vehTheta + state.lookYaw);
   const dist = state.vehicle === 'boat' ? state.camDist : state.camDist * 0.6;
-  const h = (state.vehicle === 'boat' ? 4.2 : 2.4) + state.lookPitch * 6;
+  const h = (state.vehicle === 'boat' ? 4.2 : 2.4) + state.lookPitch * 6 + dist * 0.10;  // zoomed out = scouting view, rises with distance
   const desired = vehPos.clone().addScaledVector(f, -dist).add(new THREE.Vector3(0, h, 0));
   const camFloor = groundAt(desired.x, desired.z) + 0.6;
   if (state.vehicle === 'drone') desired.y = Math.max(desired.y, camFloor);
