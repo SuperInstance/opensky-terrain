@@ -138,6 +138,9 @@ def main():
     args = sys.argv[1:]
     grid_path = Path(args[args.index("--grid") + 1])
     out = Path(args[args.index("--out") + 1])
+
+    def opt(name, default):
+        return args[args.index(name) + 1] if name in args else default
     g = np.load(grid_path)
     survey, fleet, fused = g["survey"], g["fleet"], g["fused"]
     x_centers, y_centers = g["x_centers"], g["y_centers"]
@@ -206,11 +209,21 @@ def main():
     h = hashlib.sha256()
     for rel in sorted(tile_paths):
         h.update((out / rel).read_bytes())
+    # Manifest identity comes from the bake's arguments — never hardcoded.
+    # (Defect fixed 2026-10-12: the first real bake inherited the synthetic
+    # template's region/provenance/privacy verbatim.)
+    half = float(x_centers[1] - x_centers[0]) / 2.0 if len(x_centers) > 1 else 12.5
+    mlon = 111_320.0 * np.cos(np.radians(57.05))
+    grid_bbox = {"crs": "EPSG:4326",
+                 "west": -135.43 + (float(x_centers.min()) - half) / mlon,
+                 "south": 57.05 + (float(y_centers.min()) - half) / 111_320.0,
+                 "east": -135.43 + (float(x_centers.max()) + half) / mlon,
+                 "north": 57.05 + (float(y_centers.max()) + half) / 111_320.0}
     manifest = {
         "regionPackVersion": "0.1",
-        "region": {"id": "sitka-sound-synthetic", "name": "Sitka Sound (SYNTHETIC test pack)"},
-        "boundingBox": {"crs": "EPSG:4326", "west": -135.476, "south": 57.025,
-                        "east": -135.384, "north": 57.075},
+        "region": {"id": opt("--region-id", "sitka-sound-synthetic"),
+                   "name": opt("--region-name", "Sitka Sound (SYNTHETIC test pack)")},
+        "boundingBox": grid_bbox,
         "coordinateSystems": {
             "storage": {"crs": "EPSG:4326"},
             "runtime": {"frame": "ENU", "origin": {"lat": 57.05, "lon": -135.43},
@@ -229,14 +242,12 @@ def main():
         "defaultByCameraMode": {"freeFly": 10, "boat": 5, "deck": 2, "auv": 1},
         "verticalExaggeration": {"default": 1.0},
         "sourceProvenance": [
-            {"origin": "synthetic survey (Z pack generator)", "confidence": "proMultibeam",
-             "licensing": "CC0"},
-            {"origin": "synthetic fleet soundings, CSB-corrected (csb_ref)",
-             "confidence": "fleet", "licensing": "CC-BY-4.0"},
+            {"origin": opt("--provenance", "synthetic survey + fleet fixtures (checks)"),
+             "confidence": "fleet", "licensing": "owner-retained"},
         ],
-        "license": {"code": "Apache-2.0", "data": "CC-BY-4.0"},
-        "privacy": "public",
-        "versioning": {"packVersion": "0.0.1-synthetic",
+        "license": {"code": "Apache-2.0", "data": "owner-retained"},
+        "privacy": opt("--privacy", "public"),
+        "versioning": {"packVersion": opt("--pack-version", "0.0.1-synthetic"),
                        "contentHash": "sha256:" + h.hexdigest()},
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2))

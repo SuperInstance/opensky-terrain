@@ -1,15 +1,15 @@
 {
   "regionPackVersion": "0.1",
   "region": {
-    "id": "sitka-sound-synthetic",
-    "name": "Sitka Sound (SYNTHETIC test pack)"
+    "id": "sitka-sound",
+    "name": "Sitka Sound"
   },
   "boundingBox": {
     "crs": "EPSG:4326",
-    "west": -135.476,
-    "south": 57.025,
-    "east": -135.384,
-    "north": 57.075
+    "west": -135.7,
+    "south": 56.95,
+    "east": -135.1,
+    "north": 57.2
   },
   "coordinateSystems": {
     "storage": {
@@ -27,7 +27,8 @@
   "verticalDatum": {
     "name": "MLLW",
     "units": "meters",
-    "station": "9451600"
+    "station": "9451600",
+    "status": "assumed as exported by TimeZero; TZPro configuration unverified"
   },
   "layers": {
     "terrain": {
@@ -78,30 +79,21 @@
   },
   "sourceProvenance": [
     {
-      "origin": "synthetic survey (Z pack generator)",
-      "confidence": "proMultibeam",
-      "licensing": "CC0"
-    },
-    {
-      "origin": "synthetic fleet soundings, CSB-corrected (csb_ref)",
+      "origin": "TimeZero bathy surface export (sitkasoundbathy.xyz, 50,745,068 points, from imported PBG seeds); Sitka Sound clip, water cells only, streamed 25 m grid; depths as exported (Mode A)",
       "confidence": "fleet",
-      "licensing": "CC-BY-4.0"
+      "licensing": "owner-retained"
     }
   ],
   "license": {
     "code": "Apache-2.0",
-    "data": "CC-BY-4.0"
+    "data": "owner-retained"
   },
   "privacy": "public",
   "versioning": {
-    "packVersion": "0.0.1-synthetic",
-    "contentHash": "sha256:49e1da5843c39c79a01ce198894a496ccdb15c27760cf4e5b5b7e5338e1e4317"
+    "packVersion": "1.0.0-real.2026-10-12",
+    "contentHash": "sha256:e455ed3e09581d48820ce4e8d43efadfcaa7507aee590dcd342a901255b2f06f",
+    "fullPackContentHash": "sha256:49e1da5843c39c79a01ce198894a496ccdb15c27760cf4e5b5b7e5338e1e4317",
+    "tilesInThisArtifact": 39
   },
-  "bbox": {
-    "west": -135.7,
-    "south": 56.95,
-    "east": -135.1,
-    "north": 57.2
-  },
-  "notes": "Real TimeZero bathy surface export (sitkasoundbathy.xyz), Sitka Sound clip, water cells only, streamed 25 m grid. Datum as exported by TZPro (assumed MLLW, unverified)."
+  "notes": "Published overview subset (z0-z1, 39 of 579 tiles) of pack 1.0.0-real.2026-10-12."
 }
