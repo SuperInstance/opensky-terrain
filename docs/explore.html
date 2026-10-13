@@ -571,6 +571,7 @@ const sceneListEl = document.getElementById('sceneList');
 const sceneDebEl = document.getElementById('sceneDeb');
 const sceneNavEl = document.getElementById('sceneNav');
 let prevDone = [false, false, false, false, false];
+let saveEnabled = true;
 const camPos = new THREE.Vector3(4665, 8, -779);
 let hudTimer = 0;
 const SURF_BG = new THREE.Color(0x9db8c4), UW_BG = new THREE.Color(0x07303e);
@@ -670,7 +671,7 @@ function animate() {
         sceneNavEl.textContent = `Next: ${label} · ${(hDist(bt.pos, tp) / 1000).toFixed(1)} km · ${brg}° ${PTS8[Math.round(brg / 45) % 8]}`;
       }
     }
-    try { localStorage.setItem('leadsman-run-v1', JSON.stringify({ b: [bt.pos.x, bt.pos.z, bt.theta], batt: d.battery, shoalTime, reserveSpent, sceneDone, tide: state.tide })); } catch (e) {}
+    if (saveEnabled) try { localStorage.setItem('leadsman-run-v1', JSON.stringify({ b: [bt.pos.x, bt.pos.z, bt.theta], batt: d.battery, shoalTime, reserveSpent, sceneDone, tide: state.tide })); } catch (e) {}
     if (OBJS.every(o => o[1]) && !sceneDone) { sceneDone = true; flashNote('Scene 1 complete. Debrief below.'); }
     sceneDebEl.textContent = sceneDone
       ? (reserveSpent ? 'Debrief: home — but the reserve third got spent out there. The math re-figures.' : 'Debrief: home with the third unspent. That is the discipline.')
@@ -685,17 +686,24 @@ addEventListener('resize', () => {
 });
 document.getElementById('resetRun').addEventListener('click', (e) => {
   e.preventDefault();
-  try { localStorage.removeItem('leadsman-run-v1'); } catch (err) {}
-  location.reload();
+  saveEnabled = false;   // the HUD save must not resurrect the run in the frames before navigation
+  try { localStorage.removeItem('leadsman-run-v1'); sessionStorage.setItem('leadsman-reset', '1'); } catch (err) {}
+  location.href = location.pathname;   // a reset drops practice-start params too
 });
 {
+  const wasReset = (() => { try { const f = sessionStorage.getItem('leadsman-reset'); if (f) sessionStorage.removeItem('leadsman-reset'); return !!f; } catch (e) { return false; } })();
   const startParam = new URLSearchParams(location.search).get('start');
-  if (startParam === 'jamestown') {   // practice start: in the bay, by the shoal
+  if (startParam === 'cove') {   // practice start: the wreck cove — shallow water, the spar ~115 m east
+    state.boat.pos.set(8900, state.tide, 612);
+    state.boat.theta = -1.5708;
+    state.drone.pos.set(8900, state.tide - 6, 612);
+    flashNote('Practice start: the wreck cove. Shallow water — and something breaks the surface to the east.');
+  } else if (startParam === 'jamestown') {   // practice start: in the bay, by the shoal
     state.boat.pos.set(8200, state.tide, 445);
     state.boat.theta = -1.5708;
     state.drone.pos.set(8200, state.tide - 6, 445);
     flashNote('Practice start: Jamestown Bay. The wreck cove is east, at the back of the bay.');
-  } else {
+  } else if (!wasReset) {
     try {
       const saved = JSON.parse(localStorage.getItem('leadsman-run-v1') || 'null');
       if (saved && saved.b) {
