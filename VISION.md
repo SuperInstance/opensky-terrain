@@ -102,6 +102,35 @@ fish — same water, different objectives, different games, all of them
 true. The cat-and-mouse of finding them is not an invented mode. It is
 what the harbour already does every morning.
 
+## Rehearse the real: scripts, simulation, the captain's pick
+
+A drone sortie lives on a budget — the rule of thirds: a third of the
+battery out, a third back, a third in reserve. The game respects the
+same physics, which makes it a rehearsal room instead of a toy.
+
+Agents draft candidate scripts from a library of typical patterns with
+small variations — not new programming each time, the wheel is not
+reinvented — and fly them in simulation against everything the system
+currently believes: the fused soundings, the catches, the sightings,
+the model's own predictions. A hundred rehearsals in minutes. A few
+survivors, ranked, each with its reasons.
+
+Then the human does the part only the human does: *that one — that's
+what I'm looking for.* Intent, picked from shown alternatives, not
+specified from a blank page. Over time the system learns the shape of
+the intent it serves. And the picked script can leave the game: the
+real drone flies it, in the real water, to the spots that matter — the
+ones he was going to anyway, or the just-in-case gold mines.
+
+With a fleet's data pooled — every sounder, every catch record, every
+camera anyone ran — the game becomes the shared room between running
+gear: play the next two hours in five minutes. *Go two miles and tell
+me if the school is denser up there* is a script, a simulation, and
+then, if the captain likes it, a fact-finding trip. Data feeds the
+simulation; the simulation aims the sortie; the sortie brings back
+data. The game, the chart, and the fishing are one system at three
+speeds.
+
 ## Later horizons
 
 - Fishing tows that appear in the world with the fish as they were seen.
