@@ -47,7 +47,7 @@
   #vehicles button{ padding:10px 14px; }
   #vehicles input[type=range]{ height:28px; }
   a.plain{ color:var(--accent); text-decoration:none; }
-  @media (max-width:640px){ #help{ display:none; } .title .sub{ display:none; } #scene{ top:82px; } }
+  @media (max-width:640px){ #help{ display:none; } .title .sub{ display:none; } #scene{ top:82px; } #stick{ bottom:204px; } #vertBtns{ bottom:216px; } }
 </style>
 </head>
 <body>
@@ -59,10 +59,10 @@
   <h1>Explore Sitka Sound</h1>
   <div class="sub">Scene 1 · Jamestown Bay. Real bathymetry, slow scale. Pilot the boat on the surface;
   take the drone underneath and look into the nooks. Depths as exported;
-  datum assumed MLLW. <a class="plain" href="./">← chart view</a></div>
+  datum assumed MLLW. <a class="plain" href="./" target="_blank" rel="noopener">← chart view</a></div>
 </div>
 
-<div class="hud panel" id="scene"><h3>Scene 1 — Jamestown Bay</h3><div id="sceneList">…</div><div class="deb" id="sceneDeb">The drone flies on a battery: a third out, a third back, a third in reserve.</div></div>
+<div class="hud panel" id="scene"><h3>Scene 1 — Jamestown Bay</h3><div id="sceneList">…</div><div class="deb" id="sceneNav"></div><div class="deb" id="sceneDeb">The drone flies on a battery: a third out, a third back, a third in reserve.</div><div class="deb"><a class="plain" href="#" id="resetRun">reset run</a></div></div>
 
 <div class="hud panel" id="vehicles">
   <div class="vrow">
@@ -71,8 +71,6 @@
   </div>
   <label>Tide <span><span id="tideVal">+1.4</span> m</span></label>
   <input type="range" id="tide" min="-1.5" max="4" step="0.1" value="1.4">
-  <label>Relief <span id="exVal">×1</span></label>
-  <input type="range" id="exagg" min="1" max="2" step="0.5" value="1">
 </div>
 
 <div class="hud panel" id="readout">…</div>
@@ -102,7 +100,14 @@ const ORIGIN = { lat: 57.05, lon: -135.43 };
 const MLON = 111320 * Math.cos(THREE.MathUtils.degToRad(ORIGIN.lat));
 
 // ---------- pack loading + height sampler ----------
-const index = await (await fetch(PACK + '/tiles-index.json')).json();
+const fetchRetry = async (url, asBuf) => {
+  for (let a = 0; a < 3; a++) {
+    try { const r = await fetch(url); if (r.ok) return asBuf ? await r.arrayBuffer() : await r.json(); } catch (e) {}
+    await new Promise(res => setTimeout(res, 900));
+  }
+  throw new Error('failed: ' + url);
+};
+const index = await fetchRetry(PACK + '/tiles-index.json');
 const levels = [...new Set(index.tiles.map(e => e.z))].sort((a, b) => a - b);
 let useZ = levels[levels.length - 1];
 while (index.tiles.filter(e => e.z === useZ).length > 120 && useZ > levels[0]) useZ--;
@@ -113,8 +118,9 @@ const extent = {
 };
 const tileGrids = [];   // {e, grid: Float32Array(65*65)}
 const sceneTiles = [];
+try {
 await Promise.all(entries.map(async (e) => {
-  const buf = await (await fetch(`${PACK}/tiles/${e.z}/${e.x}/${e.y}.terrain`)).arrayBuffer();
+  const buf = await fetchRetry(`${PACK}/tiles/${e.z}/${e.x}/${e.y}.terrain`, true);
   const d = decodeQuantizedMeshTile(buf);
   const grid = new Float32Array(65 * 65).fill(NaN);
   for (let i = 0; i < d.vertexCount; i++) {
@@ -134,6 +140,10 @@ await Promise.all(entries.map(async (e) => {
   tileGrids.push({ e, grid });
   sceneTiles.push({ e, d });
 }));
+} catch (err) {
+  document.getElementById('loading').textContent = 'A terrain tile failed to load — check your connection and reload the page.';
+  throw err;
+}
 
 function sampleBottom(x, yEnu) {
   for (const { e, grid } of tileGrids) {
@@ -169,7 +179,7 @@ scene.add(terrainGroup);
 const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
 {
   const cA = new THREE.Color(0x2e7ea6), cB = new THREE.Color(0x1d5d84);
-  const shallow = new THREE.Color(0x7fc4a8), wash = new THREE.Color(0x9a8f7a);
+  const shallow = new THREE.Color(0x7fc4a8), wash = new THREE.Color(0x9a8f7a), pale = new THREE.Color(0xd6ecc9);
   const tmp = new THREE.Color();
   for (const { e, d } of sceneTiles) {
     const n = d.vertexCount;
@@ -181,7 +191,8 @@ const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughnes
       pos[i * 3 + 2] = -(e.southY + (d.v[i] / 32767) * e.spanY);
       const depth = Math.max(-d.height[i], 0);
       const band = Math.floor(depth / (10 * FM));
-      tmp.copy(band % 2 ? cB : cA).lerp(shallow, THREE.MathUtils.clamp(1 - depth / 42, 0, 1) * 0.55);
+      tmp.copy(band % 2 ? cB : cA).lerp(shallow, THREE.MathUtils.clamp(1 - depth / 30, 0, 1) * 0.75);
+      if (depth > 0 && depth < 3) tmp.lerp(pale, (3 - depth) / 3 * 0.55);   // the pale patch is a place, not a rounding error
       if (d.confidence) { const w = 1 - d.confidence[i] / 255; tmp.lerp(wash, w * w * 0.6); }
       colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
     }
@@ -206,6 +217,7 @@ const SPAWN = { x: 4641, z: -779 };        // Western Anchorage
 const BAYC  = { x: 8471, z: 445 };         // Jamestown Bay centre (57.0460, -135.2900)
 const WRECK = { x: 9015, z: 612 };         // the cove at the back of the bay (57.0445, -135.2810)
 let shoalTime = 0, reserveSpent = false, sceneDone = false;
+const tideFollowers = [];   // instanced fleets that ride the tide
 let note = '', noteT = 0;
 function flashNote(s) { note = s; noteT = 4; }
 const hDist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -252,7 +264,7 @@ const hDist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
       hm.setColorAt(i, col.setHSL((i % 9) / 9, 0.25, 0.55 + (i % 4) * 0.08));
     });
     hm.instanceMatrix.needsUpdate = true; cm.instanceMatrix.needsUpdate = true;
-    scene.add(hm); scene.add(cm);
+    scene.add(hm); scene.add(cm); tideFollowers.push(hm, cm);
   }).catch(() => {});
   // the wreck in the cove — a placed dive target, from local knowledge; to be surveyed
   const wreck = new THREE.Group();
@@ -408,7 +420,7 @@ function switchVehicle(v) {
     state.vehicle = 'drone';
     if (d.aboard) {   // launch from the boat; if she's out hovering, you take her back over in place
       d.aboard = false; d.dead = false; d.diveMin = d.battery;
-      d.pos.set(b.pos.x, state.tide - 6, b.pos.z);
+      d.pos.set(b.pos.x, Math.max(groundAt(b.pos.x, b.pos.z) + 1.5, state.tide - 6), b.pos.z);   // in the shallows, launch over the bottom — never inside it
       d.theta = b.theta; d.vel.set(0, 0, 0);
     }
   } else {
@@ -430,11 +442,7 @@ document.getElementById('tide').addEventListener('input', (e) => {
   state.tide = parseFloat(e.target.value);
   document.getElementById('tideVal').textContent = (state.tide >= 0 ? '+' : '') + state.tide.toFixed(1);
   water.position.y = state.tide;
-});
-document.getElementById('exagg').addEventListener('input', (e) => {
-  state.exagg = parseFloat(e.target.value);
-  document.getElementById('exVal').textContent = '×' + state.exagg;
-  terrainGroup.scale.y = state.exagg;
+  for (const m of tideFollowers) m.position.y = state.tide - 1.4;
 });
 
 // ---------- physics ----------
@@ -473,6 +481,7 @@ function stepBoat(dt, t) {
     }
   }
   droneMesh.visible = true;
+  ring.visible = false;
 }
 function stepDrone(dt, t) {
   const d = state.drone;
@@ -481,7 +490,7 @@ function stepDrone(dt, t) {
   d.theta += input.turn * 0.9 * dt;
   const shapedD = Math.sign(input.throttle) * Math.pow(Math.abs(input.throttle), 1.4);
   const thrust = new THREE.Vector3()
-    .addScaledVector(f, shapedD * 1.7)
+    .addScaledVector(f, shapedD * 1.7 * (input.boost ? 1.75 : 1))
     .add(new THREE.Vector3(0, (input.vert + touchVert) * 1.5, 0));
   // battery: hover sips, work drinks — thirds are the discipline
   const effort = Math.min(1, Math.abs(shapedD) + Math.abs(input.vert + touchVert) + (input.boost ? 0.5 : 0));
@@ -508,14 +517,21 @@ function stepDrone(dt, t) {
   droneMesh.position.copy(d.pos);
   droneMesh.rotation.set(THREE.MathUtils.clamp(-d.vel.y * 0.1, -0.3, 0.3), d.theta, 0);
   droneMesh.visible = true;
+  ring.position.set(state.boat.pos.x, state.tide + 0.06, state.boat.pos.z);
+  ring.visible = true;
   // the boat lies where you left her, on the surface
   boatMesh.position.set(state.boat.pos.x, state.tide + Math.sin(t * 0.9) * 0.05, state.boat.pos.z);
   boatMesh.rotation.set(Math.sin(t * 0.7) * 0.008, state.boat.theta, Math.sin(t * 0.55) * 0.01);
   boatMesh.visible = true;
   // working the shoal: inside the bay, under the surface, close over the bottom
   const gnd = groundAt(d.pos.x, d.pos.z);
-  if (hDist(d.pos, BAYC) < 350 && (d.pos.y - gnd) < 6 && (state.tide - d.pos.y) > 1.5) shoalTime += dt;
+  if (hDist(d.pos, BAYC) < 350 && (d.pos.y - gnd) < 2.5 && (state.tide - d.pos.y) > 1.5) shoalTime += dt;
 }
+
+// the 15 m recovery ring: the drone's way home, drawn on the water
+const ring = new THREE.Mesh(new THREE.RingGeometry(14.5, 15.5, 48),
+  new THREE.MeshBasicMaterial({ color: 0xffb454, transparent: true, opacity: 0.45, side: THREE.DoubleSide, depthWrite: false }));
+ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring);
 
 // ---------- traffic: light theory of mind — a fast boat and a slow boat ----------
 const traffic = [];
@@ -553,6 +569,8 @@ function stepTraffic(dt, t) {
 const readout = document.getElementById('readout');
 const sceneListEl = document.getElementById('sceneList');
 const sceneDebEl = document.getElementById('sceneDeb');
+const sceneNavEl = document.getElementById('sceneNav');
+let prevDone = [false, false, false, false, false];
 const camPos = new THREE.Vector3(4665, 8, -779);
 let hudTimer = 0;
 const SURF_BG = new THREE.Color(0x9db8c4), UW_BG = new THREE.Color(0x07303e);
@@ -580,7 +598,10 @@ function animate() {
   const h = (state.vehicle === 'boat' ? 4.2 : 2.4) + state.lookPitch * 6 + dist * 0.10;  // zoomed out = scouting view, rises with distance
   const desired = vehPos.clone().addScaledVector(f, -dist).add(new THREE.Vector3(0, h, 0));
   const camFloor = groundAt(desired.x, desired.z) + 0.6;
-  if (state.vehicle === 'drone') desired.y = Math.max(desired.y, camFloor);
+  if (state.vehicle === 'drone') {
+    desired.y = Math.max(desired.y, camFloor);
+    if (state.drone.pos.y < state.tide - 0.5) desired.y = Math.max(Math.min(desired.y, state.tide - 0.35), camFloor);
+  }
   else desired.y = Math.max(desired.y, state.tide + 0.5, camFloor);
   camPos.lerp(desired, 1 - Math.exp(-3.5 * dt));
   camera.position.copy(camPos);
@@ -603,8 +624,10 @@ function animate() {
     let html = '';
     if (state.vehicle === 'boat') {
       const kn = Math.abs(bt.speed * 1.944).toFixed(1);
+      const hdgDeg = Math.round((-bt.theta * 180 / Math.PI + 360) % 360);
+      const CPTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
       const keel = (state.tide - bot).toFixed(1);
-      html = `🚤 <b>Boat</b> · ${kn} kn<br>depth under keel <b>${keel} m</b>` +
+      html = `🚤 <b>Boat</b> · ${kn} kn · hdg <b>${hdgDeg}° ${CPTS[Math.round(hdgDeg / 22.5) % 16]}</b><br>depth under keel <b>${keel} m</b>` +
         (bt.aground ? `<br><span class="warn">⚠ AGROUND — reverse off (S)</span>` : '');
       if (d.aboard) html += `<br>🤿 drone aboard · batt <b>${battPct}%</b>` + (d.battery < 0.99 ? ' · charging' : '');
       else {
@@ -628,11 +651,26 @@ function animate() {
       ['Cast off — leave the Western Anchorage', hDist(bt.pos, SPAWN) > 60],
       ['Make Jamestown Bay — east, about 4 km', hDist(bt.pos, BAYC) < 350],
       ['Work the shoal — drone down, close over the pale patch', shoalTime >= 10],
-      ['Find the wreck in the cove at the back of the bay', hDist(d.pos, WRECK) < 18 && Math.abs(d.pos.y - (groundAt(WRECK.x, WRECK.z) + 1)) < 8 && !d.aboard],
+      ['Find the wreck — watch for its spar breaking the surface in the cove', hDist(d.pos, WRECK) < 18 && Math.abs(d.pos.y - (groundAt(WRECK.x, WRECK.z) + 1)) < 8 && !d.aboard],
       ['Bring her home', hDist(bt.pos, SPAWN) < 40 && hDist(bt.pos, BAYC) >= 350 && shoalTime >= 10],
     ];
     sceneListEl.innerHTML = OBJS.map(([txt, done]) =>
       `<div class="obj ${done ? 'done' : ''}">${done ? '●' : '○'} ${txt}</div>`).join('');
+    OBJS.forEach(([txt, done], i) => { if (done && !prevDone[i]) flashNote('✓ ' + txt.split(' — ')[0]); prevDone[i] = done; });
+    const NAVT = [[null, 'cast off — the bay lies east'], [BAYC, 'Jamestown Bay'], [BAYC, 'the shoal — Jamestown Bay'], [WRECK, 'the wreck cove'], [SPAWN, 'home — Western Anchorage']];
+    const ni = OBJS.findIndex(o => !o[1]);
+    if (ni === -1) sceneNavEl.textContent = 'Scene complete.';
+    else {
+      const [tp, label] = NAVT[ni];
+      if (!tp) sceneNavEl.textContent = 'Next: ' + label + '.';
+      else {
+        const dx = tp.x - bt.pos.x, dn = -(tp.z - bt.pos.z);
+        const brg = Math.round((Math.atan2(dx, dn) * 180 / Math.PI + 360) % 360);
+        const PTS8 = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+        sceneNavEl.textContent = `Next: ${label} · ${(hDist(bt.pos, tp) / 1000).toFixed(1)} km · ${brg}° ${PTS8[Math.round(brg / 45) % 8]}`;
+      }
+    }
+    try { localStorage.setItem('leadsman-run-v1', JSON.stringify({ b: [bt.pos.x, bt.pos.z, bt.theta], batt: d.battery, shoalTime, reserveSpent, sceneDone, tide: state.tide })); } catch (e) {}
     if (OBJS.every(o => o[1]) && !sceneDone) { sceneDone = true; flashNote('Scene 1 complete. Debrief below.'); }
     sceneDebEl.textContent = sceneDone
       ? (reserveSpent ? 'Debrief: home — but the reserve third got spent out there. The math re-figures.' : 'Debrief: home with the third unspent. That is the discipline.')
@@ -645,6 +683,38 @@ addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
+document.getElementById('resetRun').addEventListener('click', (e) => {
+  e.preventDefault();
+  try { localStorage.removeItem('leadsman-run-v1'); } catch (err) {}
+  location.reload();
+});
+{
+  const startParam = new URLSearchParams(location.search).get('start');
+  if (startParam === 'jamestown') {   // practice start: in the bay, by the shoal
+    state.boat.pos.set(8200, state.tide, 445);
+    state.boat.theta = -1.5708;
+    state.drone.pos.set(8200, state.tide - 6, 445);
+    flashNote('Practice start: Jamestown Bay. The wreck cove is east, at the back of the bay.');
+  } else {
+    try {
+      const saved = JSON.parse(localStorage.getItem('leadsman-run-v1') || 'null');
+      if (saved && saved.b) {
+        state.boat.pos.set(saved.b[0], state.tide, saved.b[1]);
+        state.boat.theta = saved.b[2];
+        state.drone.pos.set(saved.b[0], state.tide - 6, saved.b[1]);
+        state.drone.battery = saved.batt; shoalTime = saved.shoalTime || 0;
+        reserveSpent = !!saved.reserveSpent; sceneDone = !!saved.sceneDone;
+        if (typeof saved.tide === 'number') {
+          state.tide = saved.tide;
+          document.getElementById('tide').value = saved.tide;
+          document.getElementById('tideVal').textContent = (saved.tide >= 0 ? '+' : '') + saved.tide.toFixed(1);
+          water.position.y = saved.tide;
+        }
+        flashNote('Welcome back — your run was restored.');
+      }
+    } catch (e) {}
+  }
+}
 document.getElementById('loading').style.display = 'none';
 animate();
 </script>
