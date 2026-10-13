@@ -85,9 +85,21 @@ rehearsals run, and new detail gets pre-figured. The pack format is the
 contract between them: the thick instance distils and publishes levels
 up; the thin one never computes what the thick one already knows.
 
+Between them sits a third weight: the **digester** — an always-on
+server in the sky with no GPU but plenty of patience. It pulls large
+things off the internet, renders and digests them into game-ready map
+data at the quality that makes sense, and serves the browser something
+far smaller than the source. It holds the hot areas warm in memory —
+more than a cold pull, less than a GPU agent — the last-mile kitchen
+between cold storage and the table. CPU-shaped work: fetching,
+reprojecting, tiling, compressing, pre-rendering. The moment a job
+needs a GPU's gradients, it belongs to the thick instance.
+
 This is already true in miniature: the public site serves the overview
 levels of Sitka Sound to anyone, while the full 25 m pack — all 579
-tiles — stays on the local machine that baked it.
+tiles — stays on the local machine that baked it. (The flight sim's
+live traffic already digests through such a server-side proxy; the
+pattern is proven in the family.)
 
 ## The living layer: from depth to life
 
