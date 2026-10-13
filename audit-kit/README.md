@@ -1,4 +1,4 @@
-# Audit Kit — ready-to-run real-data audit for the OpenSky Terrain lane
+# Audit Kit — ready-to-run real-data audit for Shoalwater
 
 Everything in this folder runs on Casey's local machine (ProArt WSL), where the
 real data lives. Built and verified 2026-10-11 — see `../VERIFICATION.md` for

@@ -24,7 +24,7 @@ def fetch_tide(station: str, begin: pd.Timestamp, end: pd.Timestamp,
     cur = begin
     while cur <= end:
         chunk_end = min(cur + pd.Timedelta(days=30), end)
-        url = (f"{API}?product=water_level&application=opensky-terrain"
+        url = (f"{API}?product=water_level&application=shoalwater"
                f"&begin_date={cur.strftime('%Y%m%d')}&end_date={chunk_end.strftime('%Y%m%d')}"
                f"&datum=MLLW&station={station}&time_zone=gmt&units=metric&format=csv")
         with urllib.request.urlopen(url, timeout=120) as resp:

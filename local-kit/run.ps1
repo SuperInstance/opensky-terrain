@@ -1,4 +1,4 @@
-# OpenSky Terrain — local pipeline launcher (Windows PowerShell)
+# Shoalwater — local pipeline launcher (Windows PowerShell)
 # One command:  powershell -ExecutionPolicy Bypass -File .\run.ps1
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot

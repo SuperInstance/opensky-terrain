@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-run_all.py — the one-command verification suite for opensky-terrain.
+run_all.py — the one-command verification suite for shoalwater.
 
 Runs every check that is self-contained in this repository and prints a
 summary. Exit code 0 only if every non-skipped check passes.
@@ -136,7 +136,7 @@ print(json.dumps({{"vertexCount": len(d["u"]), "triangleCount": len(d["triangles
     else:
         RESULTS.append(("copc-stage", "SKIP", "no pdal binary (set PDAL_BIN)"))
 
-    print("\n== opensky-terrain checks ==")
+    print("\n== shoalwater checks ==")
     for name, status, note in RESULTS:
         print(f"{status:4}  {name:18} {note}")
     bad = [r for r in RESULTS if r[1] == "FAIL"]

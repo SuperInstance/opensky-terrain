@@ -11,7 +11,7 @@ Input: a CSV from the CO-OPS datagetter API, e.g.
     https://api.tidesandcurrents.noaa.gov/api/prod/datagetter
         ?product=water_level&station=9451600&datum=MLLW
         &time_zone=gmt&units=metric&format=csv
-        &begin_date=YYYYMMDD&end_date=YYYYMMDD&application=opensky_audit
+        &begin_date=YYYYMMDD&end_date=YYYYMMDD&application=shoalwater_audit
 
     Station 9451600 is SITKA, AK (verified against NOAA station tables
     2026-10-11; 9452210 is Juneau, 9451054 is Port Alexander).

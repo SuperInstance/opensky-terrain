@@ -1,4 +1,4 @@
-# OpenSky Terrain — Local Kit (runs on your laptop, next to your data)
+# Shoalwater — Local Kit (runs on your laptop, next to your data)
 
 This kit processes **your** bathymetric data on **your** machine. Nothing is
 uploaded anywhere. The only network call is fetching the public NOAA tide

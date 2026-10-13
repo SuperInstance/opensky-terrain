@@ -1,10 +1,10 @@
-# OpenSky Terrain
+# Shoalwater
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 ## Overview
 
-OpenSky Terrain provides bathymetric Region Packs for OpenSky Flight-class 3D terrain platforms, focusing on Sitka Sound, Alaska. It establishes a data standard and a verified reference toolchain that transforms crowdsourced boat soundings (CSB) into game-ready bathymetric terrain tiles with accurate, fathom-true contours.
+Shoalwater provides bathymetric Region Packs for 3D terrain platforms, focusing on Sitka Sound, Alaska. It establishes a data standard and a verified reference toolchain that transforms crowdsourced boat soundings (CSB) into game-ready bathymetric terrain tiles with accurate, fathom-true contours.
 
 ## Purpose
 

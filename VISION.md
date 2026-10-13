@@ -178,5 +178,5 @@ speeds.
 
 The first playable slice is live today: a boat on the surface and a drone
 underneath it, over the real Sitka Sound pack, at
-https://superinstance.github.io/opensky-terrain/explore.html — the chart
+https://superinstance.github.io/shoalwater/explore.html — the chart
 view and the verified format live alongside it in this repository.
