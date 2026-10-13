@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OpenSky Terrain — Bathymetric Region Packs</title>
-<meta name="description" content="A data standard and verified reference toolchain that turns crowdsourced boat soundings into game-ready bathymetric terrain tiles with honest, fathom-true contours. Sitka Sound, Alaska.">
+<meta name="description" content="Interactive bathymetric terrain: a verified Region Pack of Sitka Sound-style seafloor, decoded and rendered in your browser from quantized-mesh tiles.">
 <style>
   :root{
     --bg:#0a1620; --bg2:#0e1f2e; --panel:#10293d; --line:#1e4258;
@@ -12,140 +12,357 @@
     --warn:#e8b34b; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
-  body{margin:0;background:linear-gradient(180deg,var(--bg) 0%,var(--bg2) 100%);
-    color:var(--ink);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-  .wrap{max-width:880px;margin:0 auto;padding:0 20px 64px}
-  header{padding:56px 0 8px}
-  .kicker{color:var(--accent);font-family:var(--mono);font-size:13px;letter-spacing:.18em;text-transform:uppercase}
-  h1{font-size:44px;line-height:1.1;margin:10px 0 12px}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  /* ---------- stage ---------- */
+  #stage{position:relative;height:100svh;min-height:520px;overflow:hidden;background:#071420}
+  #stage canvas{display:block}
+  .hud{position:absolute;z-index:5;color:var(--ink)}
+  .hud.title{top:14px;left:16px;pointer-events:none}
+  .hud.title .kicker{color:var(--accent);font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase}
+  .hud.title h1{font-size:26px;margin:2px 0 0;line-height:1.1}
+  .hud.title .sub{color:var(--dim);font-size:13px;max-width:340px}
+  .hud.simlink{top:14px;right:16px}
+  .hud.simlink a{display:inline-block;background:rgba(16,41,61,.85);border:1px solid var(--line);
+    border-radius:999px;padding:7px 14px;color:var(--ink);text-decoration:none;font-size:13.5px}
+  .hud.simlink a:hover{border-color:var(--accent)}
+  .hud.bar{left:50%;transform:translateX(-50%);bottom:12px;display:flex;gap:10px;flex-wrap:wrap;
+    justify-content:center;width:min(96vw,880px)}
+  .ctl{background:rgba(13,32,47,.88);border:1px solid var(--line);border-radius:12px;
+    padding:8px 12px;display:flex;align-items:center;gap:8px;font-size:13px;backdrop-filter:blur(4px)}
+  .ctl .lbl{color:var(--dim);font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+  .seg{display:flex;gap:4px}
+  .seg button{background:#0a1f31;color:var(--dim);border:1px solid var(--line);border-radius:8px;
+    padding:5px 10px;font-size:13px;cursor:pointer}
+  .seg button.on{color:#04121c;background:var(--accent);border-color:var(--accent);font-weight:600}
+  .tgl{background:#0a1f31;color:var(--dim);border:1px solid var(--line);border-radius:8px;
+    padding:5px 10px;font-size:13px;cursor:pointer}
+  .tgl.on{color:var(--good);border-color:var(--good)}
+  input[type=range]{width:110px;accent-color:var(--accent)}
+  .hud.readout{right:16px;bottom:76px;text-align:right;font-family:var(--mono);font-size:12.5px;
+    color:var(--dim);pointer-events:none;text-shadow:0 1px 3px #000}
+  .hud.readout b{color:var(--ink)}
+  #loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    color:var(--dim);font-family:var(--mono);font-size:14px;z-index:4;background:#071420}
+  #nogl{position:absolute;inset:auto 16px 76px 16px;z-index:6;display:none;background:#3d1420;
+    border:1px solid #7a2d3f;border-radius:10px;padding:12px 16px;font-size:14px}
+  /* ---------- info ---------- */
+  .wrap{max-width:880px;margin:0 auto;padding:8px 20px 64px}
   h2{font-size:24px;margin:44px 0 10px;border-bottom:1px solid var(--line);padding-bottom:6px}
-  .lede{font-size:19px;color:var(--dim);max-width:46em}
-  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:22px 0 4px}
-  .chip{font-family:var(--mono);font-size:12.5px;border:1px solid var(--line);
-    background:var(--panel);border-radius:999px;padding:4px 12px;color:var(--ink)}
-  .chip b{color:var(--good);font-weight:600}
   .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 22px;margin:18px 0}
   .panel.finding{border-left:4px solid var(--warn)}
-  .panel b.big{font-size:19px}
   table{width:100%;border-collapse:collapse;margin:14px 0;font-size:15px}
   th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
   th{color:var(--dim);font-weight:600}
   td.num{font-family:var(--mono);white-space:nowrap}
-  code{font-family:var(--mono);background:#0a1a28;border:1px solid var(--line);
-    border-radius:5px;padding:1px 6px;font-size:14px}
-  pre{background:#071420;border:1px solid var(--line);border-radius:10px;
-    padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:14px;line-height:1.55}
-  .pipe{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:16px 0}
-  .step{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
-  .step .n{font-family:var(--mono);color:var(--accent);font-size:12px;letter-spacing:.12em}
-  .step .t{font-weight:600;display:block;margin:4px 0}
-  .step .d{color:var(--dim);font-size:13.5px}
+  code{font-family:var(--mono);background:#0a1a28;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:14px}
+  pre{background:#071420;border:1px solid var(--line);border-radius:10px;padding:16px 18px;overflow-x:auto;
+    font-family:var(--mono);font-size:14px;line-height:1.55}
   a{color:var(--accent)}
-  ul{padding-left:22px}
-  li{margin:5px 0}
+  ul{padding-left:22px} li{margin:5px 0}
   footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);color:var(--dim);font-size:13.5px}
   .muted{color:var(--dim)}
 </style>
 </head>
 <body>
-<div class="wrap">
 
-<header>
-  <div class="kicker">SuperInstance</div>
-  <h1>OpenSky Terrain</h1>
-  <p class="lede">A data standard and a verified reference toolchain that turns
-  crowdsourced boat soundings into game-ready bathymetric terrain tiles —
-  with contours a fisherman can trust to the fathom. Built for
-  OpenSkyFlight-class Three.js platforms, around Sitka Sound, Alaska.</p>
-  <div class="chips">
-    <span class="chip">Spec <b>v0.1 + v0.2 amendments</b></span>
-    <span class="chip">Verification suite <b>10 / 10</b></span>
-    <span class="chip">Reference code <b>Python + TypeScript</b></span>
-    <span class="chip">three-tile loader spike <b>PASS</b></span>
+<!-- ==================== INTERACTIVE TERRAIN ==================== -->
+<div id="stage">
+  <div id="loading">loading Region Pack tiles…</div>
+  <div class="hud title">
+    <div class="kicker">SuperInstance · OpenSky Terrain</div>
+    <h1>Sitka Sound seafloor, live</h1>
+    <div class="sub">A verified Region Pack decoded in your browser from
+    quantized-mesh tiles — drag to orbit, scroll to zoom. Synthetic survey
+    data; the real sound comes after the first data audit.</div>
   </div>
-</header>
+  <div class="hud simlink">
+    <a href="https://luciddreamer-ai.github.io/OpenSkyFlight/" target="_blank" rel="noopener">✈ Full flight sim — OpenSkyFlight</a>
+  </div>
+  <div class="hud readout" id="readout"></div>
+  <div id="nogl">WebGL isn't available in this browser, so the live terrain
+  can't start. The findings and receipts are all below.</div>
+  <div class="hud bar">
+    <div class="ctl"><span class="lbl">Mode</span>
+      <div class="seg" id="modes">
+        <button data-mode="freeFly" class="on">Overview · 10 fm</button>
+        <button data-mode="boat">Boat · 5 fm</button>
+        <button data-mode="deck">Deck · 2 fm</button>
+        <button data-mode="auv">AUV · 1 fm</button>
+      </div>
+    </div>
+    <div class="ctl"><span class="lbl">Tide</span>
+      <input type="range" id="tide" min="-1.5" max="4" step="0.1" value="1.4">
+      <span id="tideVal" style="font-family:var(--mono)">+1.4 m</span>
+    </div>
+    <div class="ctl">
+      <button class="tgl on" id="tglWater">Water</button>
+      <button class="tgl on" id="tglConf">Confidence</button>
+      <button class="tgl" id="tglSpin">Spin</button>
+      <div class="seg" id="exagg">
+        <button data-x="1" class="on">×1</button><button data-x="2">×2 relief</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== FINDINGS ==================== -->
+<div class="wrap">
 
 <h2>The finding that started it</h2>
 <div class="panel finding">
-  <b class="big">Sitka's tide station is 9451600.</b>
+  <b>Sitka's tide station is 9451600.</b>
   <p>A widely copied research pack called NOAA station <code>9452210</code>
   “Sitka” in its spec, its generator, its ground truth, and all four of its
   audit implementations. That station is <b>Juneau</b>. Sitka is
   <code>9451600</code>; the number in the pack's bake memo, <code>9451054</code>,
-  is Port Alexander. Three station IDs, three different harbours — and every
-  tide correction downstream of the wrong one is silently wrong with it.
-  Verified against the NOAA/NCEI CO-OPS station tables; the corrections are
-  published in this repository.</p>
+  is Port Alexander. Verified against the NOAA/NCEI CO-OPS station tables.</p>
 </div>
 
 <h2>And the plateau that wasn't the algorithms' fault</h2>
 <p>Four independent tide-correction implementations plateaued at
-≈&nbsp;0.40&nbsp;fathoms of disagreement on a test shoal. The cause was not
-the math. The synthetic tide table ended at 23:54 while the sounding tracks
-ran to 03:37 — and the interpolator <i>silently clamped</i> ~300 out-of-range
-soundings to the last tide value. The fix is an invariant, now written into
-the spec: <b>tide tables must cover the full timestamp range of every
+≈&nbsp;0.40&nbsp;fathoms of disagreement on a test shoal. The tide table ended
+at 23:54 while the sounding tracks ran to 03:37 — and the interpolator
+<i>silently clamped</i> ~300 out-of-range soundings. The fix is an invariant,
+now in the spec: <b>tide tables must cover the full timestamp range of every
 sounding file; never clamp — exclude and flag.</b></p>
 
 <h2>Verified results</h2>
-<p class="muted">Every number below is reproduced by one command —
-<code>python checks/run_all.py</code> — against known ground truth.</p>
+<p class="muted">Reproduced by one command — <code>python checks/run_all.py</code> — against known ground truth.</p>
 <table>
   <tr><th>Measurement</th><th>Result</th></tr>
   <tr><td>Tide coefficient recovery (joint least squares)</td><td class="num">0.9984 vs truth 1.0</td></tr>
   <tr><td>Test shoal disagreement, raw → corrected</td><td class="num">0.996 → 0.203 fm</td></tr>
   <tr><td>Corrected soundings archived as COPC/LAZ</td><td class="num">21.7× vs XYZ</td></tr>
   <tr><td>Synthetic Region Pack</td><td class="num">22 tiles · 4 LOD levels · 1.35 MB</td></tr>
-  <tr><td>Per-tile decode verification at bake time</td><td class="num">22 / 22 tiles</td></tr>
-  <tr><td>Cross-language format proof (Python encode → TypeScript decode)</td><td class="num">exact match</td></tr>
-  <tr><td>three-tile loader spike (upstream three-tile 0.12.2)</td><td class="num">geometry + both extensions land</td></tr>
+  <tr><td>Cross-language format proof (Python → TypeScript/JS)</td><td class="num">exact match</td></tr>
+  <tr><td>three-tile loader spike (upstream 0.12.2)</td><td class="num">geometry + extensions land</td></tr>
+  <tr><td>The terrain above</td><td class="num">this pack, decoded live</td></tr>
 </table>
 
-<h2>The pipeline</h2>
-<div class="pipe">
-  <div class="step"><span class="n">STAGE 1</span><span class="t">CSB correction</span>
-    <span class="d">Joint fit: one shared tide coefficient + per-vessel transducer offsets, fitted — never sign-assumed.</span></div>
-  <div class="step"><span class="n">STAGE 2</span><span class="t">COPC archive</span>
-    <span class="d">Corrected soundings stored as COPC/LAZ at ~20× compression, WGS84 in / out.</span></div>
-  <div class="step"><span class="n">STAGE 3</span><span class="t">Fusion grid</span>
-    <span class="d">Survey preferred, fleet second, gaps interpolated — every cell carries its source.</span></div>
-  <div class="step"><span class="n">STAGE 4</span><span class="t">Tile bake</span>
-    <span class="d">Quantized-mesh tiles in a local ENU frame, per-vertex bottom-type (ext 5) and confidence (ext 6).</span></div>
-  <div class="step"><span class="n">STAGE 5</span><span class="t">Runtime</span>
-    <span class="d">TypeScript decoder + LOD selector bind contour intervals to honest mesh error. Runtime owns the tide.</span></div>
-</div>
-
-<h2>Format decisions</h2>
+<h2>What you're looking at</h2>
 <ul>
-  <li><b>Quantized-mesh-1.0 over Terrarium PNG</b> — per-vertex data carriage, true triangulation, LOD error binding.</li>
-  <li><b>Local ENU frame per pack</b> — Web Mercator rejected at 57°N; meters inside, fathoms on display.</li>
-  <li><b>Bake is static MLLW seafloor</b> — exaggeration is render-only and can never leak into physics.</li>
-  <li><b>Decoders must skip unknown extensions by length</b> — a widely used NASA loader was source-verified to break on them; ours doesn't.</li>
+  <li><b>Colour bands are the contour ladder.</b> Each band is one contour interval of the selected mode — the same intervals the LOD selector contract binds to mesh accuracy, so a finer mode never pretends to resolution the tiles don't have.</li>
+  <li><b>Confidence tint</b> (toggle) washes out vertices whose soundings were interpolated rather than measured — the extensions baked into every tile (id 5 bottom-type, id 6 confidence) rendered, not just stored.</li>
+  <li><b>The water is the runtime's job.</b> The bake is static MLLW seafloor; the tide slider moves the sea, exactly as the spec splits it. Relief ×2 is render-only — it can never leak into the data.</li>
+  <li><b>Hover the bottom</b> for a spot readout: depth in fathoms, confidence, bottom type at the nearest vertex.</li>
 </ul>
 
-<h2>Run the receipts</h2>
 <pre>git clone https://github.com/SuperInstance/opensky-terrain
 cd opensky-terrain
 python checks/run_all.py        # 10 passed, 0 failed</pre>
-<p>Requires Python 3.11+ (numpy, pandas) and Node 22+. The COPC check uses a
-PDAL binary when present and skips cleanly without one.</p>
-
-<h2>Status</h2>
-<p>Specification v0.1 with v0.2 amendments; reference implementations verified
-end-to-end on synthetic data. The first audit on real soundings awaits access
-to the local data machine — fleet data stays private, and only synthetic data
-is ever published here. One design question is still open, with the decision
-packet in the spec: pack extent vs a curved sea surface (at a 90×50&nbsp;km
-pack's corners, the earth falls 208&nbsp;m out from under a flat one).</p>
 
 <footer>
-  OpenSky Terrain — a SuperInstance project, built in the open.
-  Code: Apache-2.0. ·
+  OpenSky Terrain — a SuperInstance project, built in the open. Code: Apache-2.0. ·
   <a href="https://github.com/SuperInstance/opensky-terrain">Repository</a> ·
   <a href="https://github.com/SuperInstance/opensky-terrain/blob/main/spec/SPEC-v0.1.md">The spec</a> ·
   <a href="https://github.com/Lucineer/OpenSkyFlight">OpenSkyFlight</a>
 </footer>
-
 </div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.1/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { decodeQuantizedMeshTile } from './qm.js';
+
+const MODES = {           // SPEC §5: mode -> LOD level + contour interval
+  freeFly: { z: 0, intervalFm: 10 },
+  boat:    { z: 2, intervalFm: 5 },
+  deck:    { z: 3, intervalFm: 2 },
+  auv:     { z: 3, intervalFm: 1 },
+};
+const FM = 1.8288;
+const BOTTOM = { 1: 'rock', 2: 'sand', 3: 'mud' };
+const stage = document.getElementById('stage');
+const readout = document.getElementById('readout');
+
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+} catch (e) {
+  document.getElementById('nogl').style.display = 'block';
+  document.getElementById('loading').style.display = 'none';
+  throw e;
+}
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(stage.clientWidth, stage.clientHeight);
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a2536);
+scene.fog = new THREE.Fog(0x0a2536, 9000, 22000);
+const camera = new THREE.PerspectiveCamera(55, stage.clientWidth / stage.clientHeight, 1, 40000);
+camera.position.set(4300, 2700, 4300);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, -18, 0);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.55;
+controls.autoRotateSpeed = 0.7;
+
+scene.add(new THREE.HemisphereLight(0xbfe3f2, 0x1c2f22, 0.95));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(-3000, 5000, 2000);
+scene.add(sun);
+
+const terrainGroup = new THREE.Group();
+scene.add(terrainGroup);
+
+// Water: one plane at tide height; the bake underneath is static MLLW.
+const water = new THREE.Mesh(
+  new THREE.PlaneGeometry(6200, 6200),
+  new THREE.MeshStandardMaterial({ color: 0x14607e, transparent: true, opacity: 0.66,
+    roughness: 0.35, metalness: 0.05, side: THREE.DoubleSide }));
+water.rotation.x = -Math.PI / 2;
+water.position.y = 1.4;
+scene.add(water);
+
+const index = await (await fetch('demo-pack/tiles-index.json')).json();
+const levelCache = new Map();
+let current = null;       // { group, tiles: [{mesh, decoded}] }
+let state = { mode: 'freeFly', confidence: true };
+
+function paint(geo, decoded, intervalFm) {
+  const pos = geo.getAttribute('position');
+  const colors = new Float32Array(pos.count * 3);
+  const bandM = intervalFm * FM;
+  const cA = new THREE.Color(0x2e7ea6), cB = new THREE.Color(0x1d5d84);
+  const shallow = new THREE.Color(0x7fc4a8), wash = new THREE.Color(0x9a8f7a);
+  const tmp = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const depth = -pos.getY(i);
+    const band = Math.floor(Math.max(depth, 0) / bandM);
+    tmp.copy(band % 2 ? cB : cA).lerp(shallow, THREE.MathUtils.clamp(1 - depth / 42, 0, 1) * 0.55);
+    if (state.confidence && decoded.confidence) {
+      const w = 1 - decoded.confidence[i] / 255;      // interpolated -> washed
+      tmp.lerp(wash, w * w * 0.6);
+    }
+    colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
+
+async function loadLevel(z, intervalFm) {
+  if (levelCache.has(z)) {
+    const g = levelCache.get(z);
+    for (const t of g.tiles) paint(t.mesh.geometry, t.decoded, intervalFm);
+    return g;
+  }
+  const group = new THREE.Group();
+  const tiles = [];
+  const entries = index.tiles.filter(t => t.z === z);
+  await Promise.all(entries.map(async (e) => {
+    const buf = await (await fetch(`demo-pack/tiles/${e.z}/${e.x}/${e.y}.terrain`)).arrayBuffer();
+    const d = decodeQuantizedMeshTile(buf);
+    const n = d.vertexCount;
+    const pos = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      pos[i * 3] = e.westX + (d.u[i] / 32767) * e.spanX;
+      pos[i * 3 + 1] = d.height[i];
+      pos[i * 3 + 2] = -(e.southY + (d.v[i] / 32767) * e.spanY);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setIndex(new THREE.BufferAttribute(d.indices, 1));
+    geo.computeVertexNormals();
+    paint(geo, d, intervalFm);
+    const mesh = new THREE.Mesh(geo, terrainMat);
+    group.add(mesh);
+    tiles.push({ mesh, decoded: d });
+  }));
+  const g = { group, tiles };
+  levelCache.set(z, g);
+  return g;
+}
+
+const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+
+async function setMode(mode) {
+  state.mode = mode;
+  const { z, intervalFm } = MODES[mode];
+  const g = await loadLevel(z, intervalFm);
+  terrainGroup.clear();
+  terrainGroup.add(g.group);
+  current = g;
+}
+
+await setMode('freeFly');
+document.getElementById('loading').style.display = 'none';
+
+// ---- controls wiring ----
+document.getElementById('modes').addEventListener('click', (ev) => {
+  const b = ev.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#modes button').forEach(x => x.classList.toggle('on', x === b));
+  setMode(b.dataset.mode);
+});
+const tide = document.getElementById('tide');
+tide.addEventListener('input', () => {
+  water.position.y = parseFloat(tide.value);
+  document.getElementById('tideVal').textContent =
+    (water.position.y >= 0 ? '+' : '') + water.position.y.toFixed(1) + ' m';
+});
+document.getElementById('tglWater').addEventListener('click', (ev) => {
+  water.visible = !water.visible; ev.target.classList.toggle('on', water.visible);
+});
+document.getElementById('tglConf').addEventListener('click', (ev) => {
+  state.confidence = !state.confidence;
+  ev.target.classList.toggle('on', state.confidence);
+  if (current) for (const t of current.tiles)
+    paint(t.mesh.geometry, t.decoded, MODES[state.mode].intervalFm);
+});
+document.getElementById('tglSpin').addEventListener('click', (ev) => {
+  controls.autoRotate = !controls.autoRotate;
+  ev.target.classList.toggle('on', controls.autoRotate);
+});
+document.getElementById('exagg').addEventListener('click', (ev) => {
+  const b = ev.target.closest('button'); if (!b) return;
+  document.querySelectorAll('#exagg button').forEach(x => x.classList.toggle('on', x === b));
+  terrainGroup.scale.y = parseFloat(b.dataset.x);
+});
+
+// ---- hover readout (nearest vertex of the hit face) ----
+const ray = new THREE.Raycaster();
+const ptr = new THREE.Vector2();
+let ptrDirty = false;
+renderer.domElement.addEventListener('pointermove', (ev) => {
+  const r = renderer.domElement.getBoundingClientRect();
+  ptr.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ptrDirty = true;
+});
+function updateReadout() {
+  if (!ptrDirty || !current) return;
+  ptrDirty = false;
+  ray.setFromCamera(ptr, camera);
+  const hit = ray.intersectObjects(terrainGroup.children, true)[0];
+  if (!hit || !hit.face) { readout.innerHTML = ''; return; }
+  const entry = current.tiles.find(t => t.mesh === hit.object);
+  if (!entry) return;
+  const d = entry.decoded;
+  const vi = hit.face.a;
+  const depthFm = (-d.height[vi] / FM).toFixed(1);
+  const conf = d.confidence ? d.confidence[vi] : '—';
+  const bot = d.bottomType ? (BOTTOM[d.bottomType[vi]] ?? '—') : '—';
+  readout.innerHTML = `depth <b>${depthFm} fm</b> · confidence <b>${conf}</b> · bottom <b>${bot}</b>`;
+}
+
+function loop() {
+  requestAnimationFrame(loop);
+  controls.update();
+  updateReadout();
+  renderer.render(scene, camera);
+}
+loop();
+
+addEventListener('resize', () => {
+  camera.aspect = stage.clientWidth / stage.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(stage.clientWidth, stage.clientHeight);
+});
+</script>
 </body>
 </html>

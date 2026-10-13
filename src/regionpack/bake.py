@@ -144,6 +144,7 @@ def main():
     filled, source = fill_grid(fused, survey, fleet)
 
     tile_paths = []
+    index = []
     total_tiles = total_bytes = 0
     failures = []
     for z, stride in enumerate(STRIDES):
@@ -161,6 +162,13 @@ def main():
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
             tile_paths.append(rel)
+            index.append({
+                "z": z, "x": tile["x"], "y": tile["y"],
+                "westX": float(tile["xs"][0]), "southY": float(tile["ys"][0]),
+                "spanX": float(tile["xs"][-1] - tile["xs"][0]),
+                "spanY": float(tile["ys"][-1] - tile["ys"][0]),
+                "minHeight": float(heights.min()), "maxHeight": float(heights.max()),
+            })
             level_tiles += 1
             level_bytes += len(data)
             # --- mandatory self-check -------------------------------------
@@ -232,6 +240,7 @@ def main():
                        "contentHash": "sha256:" + h.hexdigest()},
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2))
+    (out / "tiles-index.json").write_text(json.dumps({"tiles": index}, indent=1))
     print(f"BAKE PASS: {total_tiles} tiles, {total_bytes} bytes total, "
           f"all tiles decode-verified")
 
