@@ -73,8 +73,10 @@
     <div class="kicker">SuperInstance · OpenSky Terrain</div>
     <h1>Sitka Sound seafloor, live</h1>
     <div class="sub">A verified Region Pack decoded in your browser from
-    quantized-mesh tiles — drag to orbit, scroll to zoom. Synthetic survey
-    data; the real sound comes after the first data audit.</div>
+    quantized-mesh tiles — drag to orbit, scroll to zoom. Baked 2026-10-12 from a
+    real TimeZero bathymetry export (50.7M points, Sitka Sound clip, 25 m grid,
+    579 tiles, every tile decode-verified). Depths as exported; datum assumed
+    MLLW, verification in progress.</div>
   </div>
   <div class="hud simlink">
     <a href="https://luciddreamer-ai.github.io/OpenSkyFlight/" target="_blank" rel="noopener">✈ Full flight sim — OpenSkyFlight</a>
@@ -135,6 +137,7 @@ sounding file; never clamp — exclude and flag.</b></p>
   <tr><td>Test shoal disagreement, raw → corrected</td><td class="num">0.996 → 0.203 fm</td></tr>
   <tr><td>Corrected soundings archived as COPC/LAZ</td><td class="num">21.7× vs XYZ</td></tr>
   <tr><td>Synthetic Region Pack</td><td class="num">22 tiles · 4 LOD levels · 1.35 MB</td></tr>
+  <tr><td>Real Region Pack — Sitka Sound (this page)</td><td class="num">579 tiles · 4 LOD levels · 44 MB · decode-verified</td></tr>
   <tr><td>Cross-language format proof (Python → TypeScript/JS)</td><td class="num">exact match</td></tr>
   <tr><td>three-tile loader spike (upstream 0.12.2)</td><td class="num">geometry + extensions land</td></tr>
   <tr><td>The terrain above</td><td class="num">this pack, decoded live</td></tr>
@@ -222,7 +225,8 @@ water.rotation.x = -Math.PI / 2;
 water.position.y = 1.4;
 scene.add(water);
 
-const index = await (await fetch('demo-pack/tiles-index.json')).json();
+const PACK = new URLSearchParams(location.search).get('pack') === 'demo' ? 'demo-pack' : 'real-pack';
+const index = await (await fetch(PACK + '/tiles-index.json')).json();
 const levelCache = new Map();
 let current = null;       // { group, tiles: [{mesh, decoded}] }
 let state = { mode: 'freeFly', confidence: true };
@@ -257,7 +261,7 @@ async function loadLevel(z, intervalFm) {
   const tiles = [];
   const entries = index.tiles.filter(t => t.z === z);
   await Promise.all(entries.map(async (e) => {
-    const buf = await (await fetch(`demo-pack/tiles/${e.z}/${e.x}/${e.y}.terrain`)).arrayBuffer();
+    const buf = await (await fetch(`${PACK}/tiles/${e.z}/${e.x}/${e.y}.terrain`)).arrayBuffer();
     const d = decodeQuantizedMeshTile(buf);
     const n = d.vertexCount;
     const pos = new Float32Array(n * 3);
