@@ -42,6 +42,38 @@ from interpolated colour into witnessed fact. Survey days are play days;
 mapping the game world and mapping the professional chart are the same
 motion at two registers.
 
+## The engine principles
+
+**Ground truth in, accuracy up.** The world is a fit to data, not a
+sculpture. Any truth you feed it — a sounding, a kayak track with a
+camera, a filmed pass around a wreck — makes its patch of the world more
+accurate, the same way crowd-sourced soundings tighten a chart. Exploring
+and surveying are the same act.
+
+**Grow the forest; don't count the trees.** Where detail is unmeasured,
+generate it from measured statistics: the species mix, its percentages,
+its densities and places. You never polygon every tree — you learn how
+that species grows in that area, and grow it. Generated detail is
+inference, and the format already knows how to say so: the confidence
+channel that marks interpolated seafloor marks grown shoreline the same
+way. Measured where measured, grown where not, labelled either way.
+
+**The quilt.** Rendering is a window slid over tiles: fetch once, cache
+the sliding area as wide as memory allows, never redraw what is already
+quilted, and embed information at depths that only render when you zoom
+to them — the way a chart plotter tiles a new area as you scroll into it.
+Precompute the expensive figuring; let each device draw only its level.
+
+**One world, many registers.** The same measured world wears a chart
+view for planning and a game view for being in it — the way a map app
+switches to road view, we switch to the boat. Nothing is re-authored;
+the register changes, the world doesn't.
+
+**True in space, compressed in time.** The geography, the depths, the
+tide are as measured. The pacing is edited: long transits fold away, and
+the game keeps the exciting parts — which is easy, because the real
+thing is exciting enough.
+
 ## Later horizons
 
 - Fishing tows that appear in the world with the fish as they were seen.
