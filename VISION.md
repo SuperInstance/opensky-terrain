@@ -74,6 +74,34 @@ tide are as measured. The pacing is edited: long transits fold away, and
 the game keeps the exciting parts — which is easy, because the real
 thing is exciting enough.
 
+## The living layer: from depth to life
+
+Depth, in a place like Sitka Sound, is done — the charts are good enough
+that nobody sounds for depth any more; the sounder is for fish. So the
+fog of war moves up one level: from where the bottom *is* to what is
+*living on it*.
+
+An observer changes the kind of knowledge. A camera dragged along the
+bottom for an entire trip — not highlights, whole trips — or a drone
+parked on a wreck sees what is actually there, for a while. Sightings go
+onto the map with a timestamp: last known position, staling honestly,
+the way all real intelligence does.
+
+Then the map starts to guess. A judgement model reads the terrain and
+the sightings together — crabs in the drainages, where the river's
+course runs on beneath the sea — and marks the unchecked places it
+believes in. Go and check them. A hit, and the model's confidence
+grows. A miss — above all a miss on its best prediction — is a negative
+result, recorded as one, and the math re-figures. Prediction, check,
+testimony: the survey loop, one abstraction up. The pinnacles that
+emerge this time are alive.
+
+And every fleet sees a different ocean. Seiners, gillnetters, trollers,
+longliners, crabbers, shrimpers, divers, sport boats chasing one big
+fish — same water, different objectives, different games, all of them
+true. The cat-and-mouse of finding them is not an invented mode. It is
+what the harbour already does every morning.
+
 ## Later horizons
 
 - Fishing tows that appear in the world with the fish as they were seen.
