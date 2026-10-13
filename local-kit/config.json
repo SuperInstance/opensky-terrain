@@ -1,0 +1,18 @@
+{
+  "dataDir": "data-in",
+  "soundingsFile": "soundings.csv",
+  "referenceFile": "",
+  "columns": {
+    "lon": "Lon",
+    "lat": "Lat",
+    "depth": "Depth",
+    "timestamp": "DateTime",
+    "vessel": "Vessel"
+  },
+  "depthUnit": "m",
+  "depthsAlreadyCorrected": true,
+  "tideStation": "9451600",
+  "origin": { "lat": 57.05, "lon": -135.43 },
+  "gridCellM": 25,
+  "trustedShoal": { "lon": -135.43, "lat": 57.05, "depthM": 5.5 }
+}
