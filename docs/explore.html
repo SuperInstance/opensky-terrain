@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>OpenSky Terrain — Explore Sitka Sound (boat &amp; drone)</title>
+<meta name="description" content="Pilot a boat on the surface and a drone underneath it, in a real bathymetric Region Pack of Sitka Sound — slow speeds, close up, in your browser.">
+<style>
+  :root{ --ink:#eaf3f8; --dim:#9fb8c6; --accent:#ffb454; --panel:rgba(8,24,36,.72); }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; overflow:hidden; background:#07222f;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink); }
+  #stage{ position:fixed; inset:0; }
+  canvas{ display:block; }
+  .hud{ position:fixed; z-index:10; }
+  .title{ top:14px; left:16px; pointer-events:none; text-shadow:0 1px 8px rgba(0,0,0,.6); }
+  .title .kicker{ font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--accent); }
+  .title h1{ margin:2px 0 2px; font-size:21px; font-weight:650; }
+  .title .sub{ font-size:12.5px; color:var(--dim); max-width:420px; line-height:1.45; }
+  .panel{ background:var(--panel); border:1px solid rgba(255,255,255,.14); border-radius:12px;
+    padding:10px 12px; backdrop-filter:blur(6px); }
+  #vehicles{ top:14px; right:14px; display:flex; flex-direction:column; gap:8px; align-items:stretch; }
+  .vrow{ display:flex; gap:6px; }
+  button{ font:inherit; font-size:13px; color:var(--ink); background:rgba(255,255,255,.08);
+    border:1px solid rgba(255,255,255,.18); border-radius:8px; padding:7px 11px; cursor:pointer; }
+  button.active{ background:var(--accent); color:#1a1206; border-color:var(--accent); font-weight:650; }
+  #vehicles label{ font-size:11px; color:var(--dim); display:flex; justify-content:space-between; gap:8px; }
+  #vehicles input[type=range]{ width:150px; accent-color:var(--accent); }
+  #readout{ left:16px; bottom:16px; font-variant-numeric:tabular-nums; font-size:13.5px; line-height:1.65; min-width:230px; }
+  #readout b{ color:var(--accent); font-weight:650; }
+  #readout .warn{ color:#ff7a6b; font-weight:700; }
+  #help{ right:14px; bottom:16px; font-size:12px; color:var(--dim); line-height:1.6; text-align:right; pointer-events:none; }
+  #help b{ color:var(--ink); font-weight:600; }
+  #loading{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:#07222f; z-index:40; font-size:15px; color:var(--dim); }
+  #stick{ position:fixed; width:110px; height:110px; border-radius:50%; border:1.5px solid rgba(255,255,255,.35);
+    background:rgba(255,255,255,.06); z-index:20; display:none; pointer-events:none; }
+  #stickKnob{ position:absolute; width:46px; height:46px; border-radius:50%; background:rgba(255,255,255,.35);
+    left:32px; top:32px; }
+  #vertBtns{ position:fixed; right:16px; bottom:110px; z-index:20; display:none; flex-direction:column; gap:8px; }
+  #vertBtns button{ width:52px; height:52px; border-radius:50%; font-size:19px; }
+  a.plain{ color:var(--accent); text-decoration:none; }
+  @media (max-width:640px){ #help{ display:none; } .title .sub{ display:none; } }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="loading">loading Region Pack tiles…</div>
+
+<div class="hud title">
+  <div class="kicker">SuperInstance · OpenSky Terrain</div>
+  <h1>Explore Sitka Sound</h1>
+  <div class="sub">Real bathymetry, slow scale. Pilot the boat on the surface;
+  take the drone underneath and look into the nooks. Depths as exported;
+  datum assumed MLLW. <a class="plain" href="./">← chart view</a></div>
+</div>
+
+<div class="hud panel" id="vehicles">
+  <div class="vrow">
+    <button id="btnBoat" class="active">🚤 Boat</button>
+    <button id="btnDrone">🤿 Drone</button>
+  </div>
+  <label>Tide <span><span id="tideVal">+1.4</span> m</span></label>
+  <input type="range" id="tide" min="-1.5" max="4" step="0.1" value="1.4">
+  <label>Relief <span id="exVal">×1</span></label>
+  <input type="range" id="exagg" min="1" max="2" step="0.5" value="1">
+</div>
+
+<div class="hud panel" id="readout">…</div>
+
+<div class="hud" id="help">
+  <b>W</b> throttle / forward · <b>S</b> reverse · <b>A D</b> turn<br>
+  drone: <b>R</b> rise · <b>F</b> sink · <b>Shift</b> boost · <b>Space</b> stop<br>
+  <b>V</b> switch vehicle · drag right side to look · scroll to zoom cam
+</div>
+
+<div id="stick"><div id="stickKnob"></div></div>
+<div id="vertBtns"><button id="btnUp">▲</button><button id="btnDown">▼</button></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.183.1/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { decodeQuantizedMeshTile } from './qm.js';
+
+const FM = 1.8288;
+const PACK = new URLSearchParams(location.search).get('pack') === 'demo' ? 'demo-pack' : 'real-pack';
+const ORIGIN = { lat: 57.05, lon: -135.43 };
+const MLON = 111320 * Math.cos(THREE.MathUtils.degToRad(ORIGIN.lat));
+
+// ---------- pack loading + height sampler ----------
+const index = await (await fetch(PACK + '/tiles-index.json')).json();
+const levels = [...new Set(index.tiles.map(e => e.z))].sort((a, b) => a - b);
+let useZ = levels[levels.length - 1];
+while (index.tiles.filter(e => e.z === useZ).length > 120 && useZ > levels[0]) useZ--;
+const entries = index.tiles.filter(e => e.z === useZ);
+const extent = {
+  minX: Math.min(...entries.map(e => e.westX)), maxX: Math.max(...entries.map(e => e.westX + e.spanX)),
+  minY: Math.min(...entries.map(e => e.southY)), maxY: Math.max(...entries.map(e => e.southY + e.spanY)),
+};
+const tileGrids = [];   // {e, grid: Float32Array(65*65)}
+const sceneTiles = [];
+await Promise.all(entries.map(async (e) => {
+  const buf = await (await fetch(`${PACK}/tiles/${e.z}/${e.x}/${e.y}.terrain`)).arrayBuffer();
+  const d = decodeQuantizedMeshTile(buf);
+  const grid = new Float32Array(65 * 65).fill(NaN);
+  for (let i = 0; i < d.vertexCount; i++) {
+    const cx = Math.round(d.u[i] / 32767 * 64), cy = Math.round(d.v[i] / 32767 * 64);
+    grid[cy * 65 + cx] = d.height[i];
+  }
+  // fill any lattice holes from the nearest filled neighbour (sparse edges)
+  for (let k = 0; k < 65 * 65; k++) if (Number.isNaN(grid[k])) {
+    const cx = k % 65, cy = (k / 65) | 0;
+    let best = Infinity, val = e.minHeight;
+    for (let j = 0; j < 65 * 65; j++) if (!Number.isNaN(grid[j])) {
+      const dd = Math.abs(j % 65 - cx) + Math.abs(((j / 65) | 0) - cy);
+      if (dd < best) { best = dd; val = grid[j]; }
+    }
+    grid[k] = val;
+  }
+  tileGrids.push({ e, grid });
+  sceneTiles.push({ e, d });
+}));
+
+function sampleBottom(x, yEnu) {
+  for (const { e, grid } of tileGrids) {
+    if (x >= e.westX && x <= e.westX + e.spanX && yEnu >= e.southY && yEnu <= e.southY + e.spanY) {
+      const fx = (x - e.westX) / e.spanX * 64, fy = (yEnu - e.southY) / e.spanY * 64;
+      const x0 = Math.min(63, Math.floor(fx)), y0 = Math.min(63, Math.floor(fy));
+      const tx = fx - x0, ty = fy - y0;
+      const g = (cx, cy) => grid[cy * 65 + cx];
+      return g(x0, y0) * (1 - tx) * (1 - ty) + g(x0 + 1, y0) * tx * (1 - ty)
+           + g(x0, y0 + 1) * (1 - tx) * ty + g(x0 + 1, y0 + 1) * tx * ty;
+    }
+  }
+  return -60; // outside the pack: assume deep water
+}
+
+// ---------- scene ----------
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9db8c4);
+scene.fog = new THREE.FogExp2(0x9db8c4, 0.0016);
+const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.1, 6000);
+scene.add(new THREE.HemisphereLight(0xbfe3f2, 0x1c3b4a, 0.85));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+sun.position.set(600, 900, 300);
+scene.add(sun);
+
+const terrainGroup = new THREE.Group();
+scene.add(terrainGroup);
+const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
+{
+  const cA = new THREE.Color(0x2e7ea6), cB = new THREE.Color(0x1d5d84);
+  const shallow = new THREE.Color(0x7fc4a8), wash = new THREE.Color(0x9a8f7a);
+  const tmp = new THREE.Color();
+  for (const { e, d } of sceneTiles) {
+    const n = d.vertexCount;
+    const pos = new Float32Array(n * 3);
+    const colors = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) {
+      pos[i * 3] = e.westX + (d.u[i] / 32767) * e.spanX;
+      pos[i * 3 + 1] = d.height[i];
+      pos[i * 3 + 2] = -(e.southY + (d.v[i] / 32767) * e.spanY);
+      const depth = Math.max(-d.height[i], 0);
+      const band = Math.floor(depth / (10 * FM));
+      tmp.copy(band % 2 ? cB : cA).lerp(shallow, THREE.MathUtils.clamp(1 - depth / 42, 0, 1) * 0.55);
+      if (d.confidence) { const w = 1 - d.confidence[i] / 255; tmp.lerp(wash, w * w * 0.6); }
+      colors[i * 3] = tmp.r; colors[i * 3 + 1] = tmp.g; colors[i * 3 + 2] = tmp.b;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.setIndex(new THREE.BufferAttribute(d.indices, 1));
+    geo.computeVertexNormals();
+    terrainGroup.add(new THREE.Mesh(geo, terrainMat));
+  }
+}
+const water = new THREE.Mesh(
+  new THREE.PlaneGeometry(extent.maxX - extent.minX, extent.maxY - extent.minY),
+  new THREE.MeshStandardMaterial({ color: 0x2f7ea6, transparent: true, opacity: 0.5,
+    roughness: 0.15, metalness: 0, side: THREE.DoubleSide, depthWrite: false }));
+water.rotation.x = -Math.PI / 2;
+water.position.set((extent.minX + extent.maxX) / 2, 1.4, -(extent.minY + extent.maxY) / 2);
+scene.add(water);
+
+// ---------- vehicles ----------
+function buildBoat() {
+  const g = new THREE.Group();
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 6.4),
+    new THREE.MeshStandardMaterial({ color: 0xdfe6ea, roughness: 0.6 }));
+  hull.position.y = 0.15; g.add(hull);
+  const bow = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 1.1, 2.2, 4),
+    new THREE.MeshStandardMaterial({ color: 0xdfe6ea, roughness: 0.6 }));
+  bow.rotation.set(Math.PI / 2, Math.PI / 4, 0); bow.position.set(0, 0.15, -4.2); bow.scale.set(1, 1, 0.45); g.add(bow);
+  const keel = new THREE.Mesh(new THREE.BoxGeometry(2.24, 0.35, 6.44),
+    new THREE.MeshStandardMaterial({ color: 0xa33327, roughness: 0.7 }));
+  keel.position.y = -0.3; g.add(keel);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.15, 2.4),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }));
+  cabin.position.set(0, 1.2, 0.4); g.add(cabin);
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.4),
+    new THREE.MeshStandardMaterial({ color: 0x555f66 }));
+  mast.position.set(0, 2.6, -1.4); g.add(mast);
+  return g;
+}
+function buildDrone() {
+  const g = new THREE.Group();
+  const yellow = new THREE.MeshStandardMaterial({ color: 0xf7b731, roughness: 0.55 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.8, 2.2), yellow); g.add(body);
+  const float_ = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.4, 1.6),
+    new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.6 }));
+  float_.position.y = 0.6; g.add(float_);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(0.34, 20, 14),
+    new THREE.MeshStandardMaterial({ color: 0x18222a, roughness: 0.2, metalness: 0.4 }));
+  dome.position.set(0, -0.05, -1.15); g.add(dome);
+  for (const sx of [-0.85, 0.85]) {
+    const skid = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 2.3),
+      new THREE.MeshStandardMaterial({ color: 0x333c44 }));
+    skid.position.set(sx, -0.62, 0); g.add(skid);
+  }
+  const lamp = new THREE.SpotLight(0xfff2cc, 260, 60, 0.5, 0.5, 1.6);
+  lamp.position.set(0, -0.1, -1.2);
+  const tgt = new THREE.Object3D(); tgt.position.set(0, -2.5, -14);
+  g.add(tgt); lamp.target = tgt; g.add(lamp);
+  return g;
+}
+const boatMesh = buildBoat(); scene.add(boatMesh);
+const droneMesh = buildDrone(); scene.add(droneMesh);
+
+const state = {
+  vehicle: 'boat', tide: 1.4, exagg: 1,
+  boat: { pos: new THREE.Vector3(300, 1.4, 100), theta: 2.5, speed: 0, aground: false },
+  drone: { pos: new THREE.Vector3(300, -4.6, 100), theta: 2.5, vel: new THREE.Vector3() },
+  camDist: 12, lookYaw: 0, lookPitch: 0,
+};
+const groundAt = (x, z) => sampleBottom(x, -z) * state.exagg;
+const fwdOf = (th) => new THREE.Vector3(-Math.sin(th), 0, -Math.cos(th));
+
+// ---------- input ----------
+const keys = {};
+addEventListener('keydown', (e) => {
+  keys[e.code] = true;
+  if (e.code === 'KeyV') switchVehicle(state.vehicle === 'boat' ? 'drone' : 'boat');
+  if (e.code === 'Space') e.preventDefault();
+});
+addEventListener('keyup', (e) => keys[e.code] = false);
+const input = { throttle: 0, turn: 0, vert: 0, boost: false, brake: false };
+function readKeys() {
+  if (stickId === null) {  // the touch joystick owns throttle/turn while active
+    input.throttle = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
+    input.turn = (keys.KeyA || keys.ArrowLeft ? 1 : 0) - (keys.KeyD || keys.ArrowRight ? 1 : 0);
+  }
+  input.vert = (keys.KeyR ? 1 : 0) - (keys.KeyF ? 1 : 0);
+  input.boost = !!keys.ShiftLeft || !!keys.ShiftRight;
+  input.brake = !!keys.Space;
+}
+// touch joystick (left) + look drag (right)
+const stick = document.getElementById('stick'), knob = document.getElementById('stickKnob');
+let stickId = null, stickOrigin = { x: 0, y: 0 }, lookId = null, lookLast = { x: 0, y: 0 };
+const vertBtns = document.getElementById('vertBtns');
+let touchVert = 0;
+addEventListener('touchstart', (e) => {
+  for (const t of e.changedTouches) {
+    if (t.clientX < innerWidth * 0.45 && stickId === null) {
+      stickId = t.identifier; stickOrigin = { x: t.clientX, y: t.clientY };
+      stick.style.display = 'block';
+      stick.style.left = (t.clientX - 55) + 'px'; stick.style.top = (t.clientY - 55) + 'px';
+    } else if (lookId === null) { lookId = t.identifier; lookLast = { x: t.clientX, y: t.clientY }; }
+  }
+}, { passive: true });
+addEventListener('touchmove', (e) => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === stickId) {
+      const dx = THREE.MathUtils.clamp((t.clientX - stickOrigin.x) / 45, -1, 1);
+      const dy = THREE.MathUtils.clamp((t.clientY - stickOrigin.y) / 45, -1, 1);
+      knob.style.left = (32 + dx * 30) + 'px'; knob.style.top = (32 + dy * 30) + 'px';
+      input.turn = -dx; input.throttle = -dy;
+    } else if (t.identifier === lookId) {
+      state.lookYaw -= (t.clientX - lookLast.x) * 0.005;
+      state.lookPitch = THREE.MathUtils.clamp(state.lookPitch - (t.clientY - lookLast.y) * 0.004, -0.5, 0.9);
+      lookLast = { x: t.clientX, y: t.clientY };
+    }
+  }
+}, { passive: true });
+addEventListener('touchend', (e) => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === stickId) { stickId = null; stick.style.display = 'none'; knob.style.left = '32px'; knob.style.top = '32px'; }
+    if (t.identifier === lookId) lookId = null;
+  }
+});
+let mouseLook = false, mouseLast = { x: 0, y: 0 };
+addEventListener('mousedown', (e) => { if (e.target === renderer.domElement) { mouseLook = true; mouseLast = { x: e.clientX, y: e.clientY }; } });
+addEventListener('mousemove', (e) => {
+  if (!mouseLook) return;
+  state.lookYaw -= (e.clientX - mouseLast.x) * 0.005;
+  state.lookPitch = THREE.MathUtils.clamp(state.lookPitch - (e.clientY - mouseLast.y) * 0.004, -0.5, 0.9);
+  mouseLast = { x: e.clientX, y: e.clientY };
+});
+addEventListener('mouseup', () => mouseLook = false);
+addEventListener('wheel', (e) => { state.camDist = THREE.MathUtils.clamp(state.camDist + e.deltaY * 0.02, 4, 30); }, { passive: true });
+for (const [id, v] of [['btnUp', 1], ['btnDown', -1]]) {
+  const el = document.getElementById(id);
+  el.addEventListener('touchstart', (e) => { touchVert = v; e.preventDefault(); }, { passive: false });
+  el.addEventListener('touchend', () => touchVert = 0);
+  el.addEventListener('mousedown', () => touchVert = v);
+  el.addEventListener('mouseup', () => touchVert = 0);
+}
+
+// ---------- vehicle switching + controls ----------
+const btnBoat = document.getElementById('btnBoat'), btnDrone = document.getElementById('btnDrone');
+function switchVehicle(v) {
+  state.vehicle = v;
+  btnBoat.classList.toggle('active', v === 'boat');
+  btnDrone.classList.toggle('active', v === 'drone');
+  vertBtns.style.display = v === 'drone' ? 'flex' : 'none';
+  if (v === 'drone') {
+    state.drone.pos.set(state.boat.pos.x, state.tide - 6, state.boat.pos.z);
+    state.drone.theta = state.boat.theta;
+    state.drone.vel.set(0, 0, 0);
+  } else {
+    state.boat.pos.set(state.drone.pos.x, state.tide, state.drone.pos.z);
+    state.boat.theta = state.drone.theta;
+  }
+}
+btnBoat.addEventListener('click', () => switchVehicle('boat'));
+btnDrone.addEventListener('click', () => switchVehicle('drone'));
+document.getElementById('tide').addEventListener('input', (e) => {
+  state.tide = parseFloat(e.target.value);
+  document.getElementById('tideVal').textContent = (state.tide >= 0 ? '+' : '') + state.tide.toFixed(1);
+  water.position.y = state.tide;
+});
+document.getElementById('exagg').addEventListener('input', (e) => {
+  state.exagg = parseFloat(e.target.value);
+  document.getElementById('exVal').textContent = '×' + state.exagg;
+  terrainGroup.scale.y = state.exagg;
+});
+
+// ---------- physics ----------
+const clock = new THREE.Clock();
+function stepBoat(dt, t) {
+  const b = state.boat;
+  const target = input.throttle > 0 ? 6 : input.throttle < 0 ? -2 : 0;
+  const rate = input.brake ? 3.2 : 1.1;
+  b.speed += THREE.MathUtils.clamp(target - b.speed, -rate * dt, rate * dt);
+  if (b.aground && b.speed > 0) b.speed = 0;
+  b.theta += input.turn * (0.12 + 0.38 * Math.min(Math.abs(b.speed) / 3, 1)) * Math.sign(b.speed || 1) * dt;
+  const f = fwdOf(b.theta);
+  b.pos.addScaledVector(f, b.speed * dt);
+  b.pos.x = THREE.MathUtils.clamp(b.pos.x, extent.minX + 5, extent.maxX - 5);
+  b.pos.z = THREE.MathUtils.clamp(b.pos.z, -(extent.maxY - 5), -(extent.minY + 5));
+  const bow = b.pos.clone().addScaledVector(f, 3.4);
+  b.aground = groundAt(bow.x, bow.z) > state.tide - 0.45 && Math.abs(b.speed) > 0.01;
+  b.pos.y = state.tide + Math.sin(t * 0.9) * 0.05;
+  boatMesh.position.copy(b.pos);
+  boatMesh.rotation.set(Math.sin(t * 0.7) * 0.008, b.theta, Math.sin(t * 0.55) * 0.01);
+  droneMesh.visible = false; boatMesh.visible = true;
+}
+function stepDrone(dt) {
+  const d = state.drone;
+  const f = fwdOf(d.theta);
+  const maxF = input.boost ? 4.5 : 2.6;
+  d.theta += input.turn * 0.9 * dt;
+  const thrust = new THREE.Vector3()
+    .addScaledVector(f, input.throttle * 1.7)
+    .add(new THREE.Vector3(0, (input.vert + touchVert) * 1.5, 0));
+  d.vel.addScaledVector(thrust, dt);
+  d.vel.multiplyScalar(Math.exp(-1.7 * dt));
+  if (input.brake) d.vel.multiplyScalar(Math.exp(-6 * dt));
+  if (d.vel.length() > maxF * 1.4) d.vel.setLength(maxF * 1.4);
+  d.pos.addScaledVector(d.vel, dt);
+  d.pos.x = THREE.MathUtils.clamp(d.pos.x, extent.minX + 3, extent.maxX - 3);
+  d.pos.z = THREE.MathUtils.clamp(d.pos.z, -(extent.maxY - 3), -(extent.minY + 3));
+  const floor = groundAt(d.pos.x, d.pos.z) + 0.8;
+  if (d.pos.y < floor) { d.pos.y = floor; d.vel.y = Math.max(d.vel.y, 0); }
+  const ceil = state.tide - 0.4;
+  if (d.pos.y > ceil) { d.pos.y = ceil; d.vel.y = Math.min(d.vel.y, 0); }
+  droneMesh.position.copy(d.pos);
+  droneMesh.rotation.set(THREE.MathUtils.clamp(-d.vel.y * 0.1, -0.3, 0.3), d.theta, 0);
+  droneMesh.visible = true; boatMesh.visible = false;
+}
+
+// ---------- camera + HUD + loop ----------
+const readout = document.getElementById('readout');
+const camPos = new THREE.Vector3(300, 12, 130);
+let hudTimer = 0;
+const SURF_BG = new THREE.Color(0x9db8c4), UW_BG = new THREE.Color(0x07303e);
+const SURF_FOG = new THREE.Color(0x9db8c4), UW_FOG = new THREE.Color(0x0a4258);
+function latLon(x, z) {
+  return { lon: ORIGIN.lon + x / MLON, lat: ORIGIN.lat + (-z) / 111320 };
+}
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+  readKeys();
+  let vehPos, vehTheta;
+  if (state.vehicle === 'boat') { stepBoat(dt, t); vehPos = state.boat.pos; vehTheta = state.boat.theta; }
+  else { stepDrone(dt); vehPos = state.drone.pos; vehTheta = state.drone.theta; }
+
+  const f = fwdOf(vehTheta + state.lookYaw);
+  const dist = state.vehicle === 'boat' ? state.camDist : state.camDist * 0.6;
+  const h = (state.vehicle === 'boat' ? 4.2 : 2.4) + state.lookPitch * 6;
+  const desired = vehPos.clone().addScaledVector(f, -dist).add(new THREE.Vector3(0, h, 0));
+  const camFloor = groundAt(desired.x, desired.z) + 0.6;
+  if (state.vehicle === 'drone') desired.y = Math.max(desired.y, camFloor);
+  else desired.y = Math.max(desired.y, state.tide + 0.5, camFloor);
+  camPos.lerp(desired, 1 - Math.exp(-3.5 * dt));
+  camera.position.copy(camPos);
+  camera.lookAt(vehPos.clone().addScaledVector(f, 8).add(new THREE.Vector3(0, 0.6, 0)));
+
+  const under = camera.position.y < state.tide;
+  scene.background.copy(under ? UW_BG : SURF_BG);
+  scene.fog.color.copy(under ? UW_FOG : SURF_FOG);
+  scene.fog.density = under ? 0.03 : 0.0016;
+  sun.intensity = under ? 0.55 : 1.6;
+
+  hudTimer += dt;
+  if (hudTimer > 0.12) {
+    hudTimer = 0;
+    const p = latLon(vehPos.x, vehPos.z);
+    const bot = groundAt(vehPos.x, vehPos.z);
+    if (state.vehicle === 'boat') {
+      const kn = Math.abs(state.boat.speed * 1.944).toFixed(1);
+      const keel = (state.tide - bot).toFixed(1);
+      readout.innerHTML = `🚤 <b>Boat</b> · ${kn} kn<br>depth under keel <b>${keel} m</b>` +
+        (state.boat.aground ? `<br><span class="warn">⚠ AGROUND — reverse off (S)</span>` : '') +
+        `<br><span style="color:var(--dim)">${p.lat.toFixed(4)}°, ${p.lon.toFixed(4)}°</span>`;
+    } else {
+      const d = state.drone;
+      readout.innerHTML = `🤿 <b>Drone</b> · ${d.vel.length().toFixed(1)} m/s<br>` +
+        `depth <b>${(state.tide - d.pos.y).toFixed(1)} m</b> · clearance <b>${(d.pos.y - bot).toFixed(1)} m</b><br>` +
+        `<span style="color:var(--dim)">${p.lat.toFixed(4)}°, ${p.lon.toFixed(4)}°</span>`;
+    }
+  }
+  renderer.render(scene, camera);
+}
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+document.getElementById('loading').style.display = 'none';
+animate();
+</script>
+</body>
+</html>
