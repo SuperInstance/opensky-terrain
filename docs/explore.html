@@ -8,7 +8,7 @@
 <style>
   :root{ --ink:#eaf3f8; --dim:#9fb8c6; --accent:#ffb454; --panel:rgba(8,24,36,.72); }
   *{ box-sizing:border-box; }
-  html,body{ margin:0; height:100%; overflow:hidden; background:#07222f;
+  html,body{ margin:0; height:100%; overflow:hidden; background:#07222f; touch-action:none; overscroll-behavior:none;
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; color:var(--ink); }
   #stage{ position:fixed; inset:0; }
   canvas{ display:block; }
@@ -33,12 +33,14 @@
   #help b{ color:var(--ink); font-weight:600; }
   #loading{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
     background:#07222f; z-index:40; font-size:15px; color:var(--dim); }
-  #stick{ position:fixed; width:110px; height:110px; border-radius:50%; border:1.5px solid rgba(255,255,255,.35);
-    background:rgba(255,255,255,.06); z-index:20; display:none; pointer-events:none; }
-  #stickKnob{ position:absolute; width:46px; height:46px; border-radius:50%; background:rgba(255,255,255,.35);
-    left:32px; top:32px; }
-  #vertBtns{ position:fixed; right:16px; bottom:110px; z-index:20; display:none; flex-direction:column; gap:8px; }
-  #vertBtns button{ width:52px; height:52px; border-radius:50%; font-size:19px; }
+  #stick{ position:fixed; left:18px; bottom:96px; width:128px; height:128px; border-radius:50%;
+    border:1.5px solid rgba(255,255,255,.35); background:rgba(255,255,255,.06); z-index:20; display:none; }
+  #stickKnob{ position:absolute; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35);
+    left:37px; top:37px; pointer-events:none; }
+  #vertBtns{ position:fixed; right:16px; bottom:150px; z-index:20; display:none; flex-direction:column; gap:10px; }
+  #vertBtns button{ width:62px; height:62px; border-radius:50%; font-size:22px; }
+  #vehicles button{ padding:10px 14px; }
+  #vehicles input[type=range]{ height:28px; }
   a.plain{ color:var(--accent); text-decoration:none; }
   @media (max-width:640px){ #help{ display:none; } .title .sub{ display:none; } }
 </style>
@@ -265,25 +267,32 @@ function readKeys() {
 }
 // touch joystick (left) + look drag (right)
 const stick = document.getElementById('stick'), knob = document.getElementById('stickKnob');
-let stickId = null, stickOrigin = { x: 0, y: 0 }, lookId = null, lookLast = { x: 0, y: 0 };
+let stickId = null, lookId = null, lookLast = { x: 0, y: 0 };
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
+if (IS_TOUCH) stick.style.display = 'block';
+function stickCenter() { const r = stick.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
 const vertBtns = document.getElementById('vertBtns');
 let touchVert = 0;
 addEventListener('touchstart', (e) => {
   for (const t of e.changedTouches) {
-    if (t.clientX < innerWidth * 0.45 && stickId === null) {
-      stickId = t.identifier; stickOrigin = { x: t.clientX, y: t.clientY };
-      stick.style.display = 'block';
-      stick.style.left = (t.clientX - 55) + 'px'; stick.style.top = (t.clientY - 55) + 'px';
-    } else if (lookId === null) { lookId = t.identifier; lookLast = { x: t.clientX, y: t.clientY }; }
+    const sr = stick.getBoundingClientRect();
+    const onStick = t.clientX >= sr.left - 14 && t.clientX <= sr.right + 14
+      && t.clientY >= sr.top - 14 && t.clientY <= sr.bottom + 14;
+    const onUi = t.target.closest && t.target.closest('.hud, #vertBtns, button, input');
+    if (onStick && stickId === null) stickId = t.identifier;
+    else if (!onUi && lookId === null) { lookId = t.identifier; lookLast = { x: t.clientX, y: t.clientY }; }
   }
 }, { passive: true });
 addEventListener('touchmove', (e) => {
   for (const t of e.changedTouches) {
     if (t.identifier === stickId) {
-      const dx = THREE.MathUtils.clamp((t.clientX - stickOrigin.x) / 45, -1, 1);
-      const dy = THREE.MathUtils.clamp((t.clientY - stickOrigin.y) / 45, -1, 1);
-      knob.style.left = (32 + dx * 30) + 'px'; knob.style.top = (32 + dy * 30) + 'px';
-      input.turn = -dx; input.throttle = -dy;
+      const c = stickCenter();
+      const dx = THREE.MathUtils.clamp((t.clientX - c.x) / 46, -1, 1);
+      const dy = THREE.MathUtils.clamp((t.clientY - c.y) / 46, -1, 1);
+      knob.style.left = (37 + dx * 34) + 'px'; knob.style.top = (37 + dy * 34) + 'px';
+      const dz = (v) => Math.abs(v) < 0.12 ? 0 : v;   // dead zone
+      input.turn = -dz(dx) * 0.75;                     // gentler steering gain
+      input.throttle = -dz(dy);
     } else if (t.identifier === lookId) {
       state.lookYaw -= (t.clientX - lookLast.x) * 0.005;
       state.lookPitch = THREE.MathUtils.clamp(state.lookPitch - (t.clientY - lookLast.y) * 0.004, -0.5, 0.9);
@@ -293,7 +302,7 @@ addEventListener('touchmove', (e) => {
 }, { passive: true });
 addEventListener('touchend', (e) => {
   for (const t of e.changedTouches) {
-    if (t.identifier === stickId) { stickId = null; stick.style.display = 'none'; knob.style.left = '32px'; knob.style.top = '32px'; }
+    if (t.identifier === stickId) { stickId = null; knob.style.left = '37px'; knob.style.top = '37px'; input.throttle = 0; input.turn = 0; }
     if (t.identifier === lookId) lookId = null;
   }
 });
@@ -348,7 +357,8 @@ document.getElementById('exagg').addEventListener('input', (e) => {
 const clock = new THREE.Clock();
 function stepBoat(dt, t) {
   const b = state.boat;
-  const target = input.throttle > 0 ? 6 : input.throttle < 0 ? -2 : 0;
+  const shaped = Math.sign(input.throttle) * Math.pow(Math.abs(input.throttle), 1.4);
+  const target = shaped * (shaped > 0 ? 6 : 2);
   const rate = input.brake ? 3.2 : 1.1;
   b.speed += THREE.MathUtils.clamp(target - b.speed, -rate * dt, rate * dt);
   if (b.aground && b.speed > 0) b.speed = 0;
@@ -369,8 +379,9 @@ function stepDrone(dt) {
   const f = fwdOf(d.theta);
   const maxF = input.boost ? 4.5 : 2.6;
   d.theta += input.turn * 0.9 * dt;
+  const shapedD = Math.sign(input.throttle) * Math.pow(Math.abs(input.throttle), 1.4);
   const thrust = new THREE.Vector3()
-    .addScaledVector(f, input.throttle * 1.7)
+    .addScaledVector(f, shapedD * 1.7)
     .add(new THREE.Vector3(0, (input.vert + touchVert) * 1.5, 0));
   d.vel.addScaledVector(thrust, dt);
   d.vel.multiplyScalar(Math.exp(-1.7 * dt));
@@ -406,6 +417,10 @@ function animate() {
   if (state.vehicle === 'boat') { stepBoat(dt, t); vehPos = state.boat.pos; vehTheta = state.boat.theta; }
   else { stepDrone(dt); vehPos = state.drone.pos; vehTheta = state.drone.theta; }
 
+  if (!mouseLook && lookId === null) {
+    state.lookYaw *= Math.exp(-0.25 * dt);
+    state.lookPitch *= Math.exp(-0.6 * dt);
+  }
   const f = fwdOf(vehTheta + state.lookYaw);
   const dist = state.vehicle === 'boat' ? state.camDist : state.camDist * 0.6;
   const h = (state.vehicle === 'boat' ? 4.2 : 2.4) + state.lookPitch * 6;
