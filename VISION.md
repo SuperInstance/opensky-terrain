@@ -95,6 +95,16 @@ between cold storage and the table. CPU-shaped work: fetching,
 reprojecting, tiling, compressing, pre-rendering. The moment a job
 needs a GPU's gradients, it belongs to the thick instance.
 
+In development, the thick instance doubles as the **asset factory**.
+Baking data is fast; beauty is slow, and slowness is acceptable when it
+runs overnight: full-surface bakes of entire data files (not just one
+bay's clip), full-map renders, and generated assets — AI-grown meshes
+for boats, trees, buildings, a wreck; vector drawings for symbology
+and interfaces — refined in the 3D tools and shipped as game-ready
+geometry. The overnight queue is a feature of the workflow, not an
+embarrassment: measure the small render, extrapolate honestly, queue
+the big one, wake up to a world.
+
 This is already true in miniature: the public site serves the overview
 levels of Sitka Sound to anyone, while the full 25 m pack — all 579
 tiles — stays on the local machine that baked it. (The flight sim's
