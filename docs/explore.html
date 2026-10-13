@@ -240,8 +240,8 @@ const droneMesh = buildDrone(); scene.add(droneMesh);
 
 const state = {
   vehicle: 'boat', tide: 1.4, exagg: 1,
-  boat: { pos: new THREE.Vector3(300, 1.4, 100), theta: 2.5, speed: 0, aground: false },
-  drone: { pos: new THREE.Vector3(300, -4.6, 100), theta: 2.5, vel: new THREE.Vector3() },
+  boat: { pos: new THREE.Vector3(4641, 1.4, -779), theta: 1.5708, speed: 0, aground: false },  // Western Anchorage, off Thomsen Harbor, facing out past Channel Rock
+  drone: { pos: new THREE.Vector3(4641, -4.6, -779), theta: 1.5708, vel: new THREE.Vector3() },
   camDist: 12, lookYaw: 0, lookPitch: 0,
 };
 const groundAt = (x, z) => sampleBottom(x, -z) * state.exagg;
@@ -401,7 +401,7 @@ function stepDrone(dt) {
 
 // ---------- camera + HUD + loop ----------
 const readout = document.getElementById('readout');
-const camPos = new THREE.Vector3(300, 12, 130);
+const camPos = new THREE.Vector3(4665, 8, -779);
 let hudTimer = 0;
 const SURF_BG = new THREE.Color(0x9db8c4), UW_BG = new THREE.Color(0x07303e);
 const SURF_FOG = new THREE.Color(0x9db8c4), UW_FOG = new THREE.Color(0x0a4258);
