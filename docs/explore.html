@@ -448,12 +448,12 @@ function animate() {
       const keel = (state.tide - bot).toFixed(1);
       readout.innerHTML = `🚤 <b>Boat</b> · ${kn} kn<br>depth under keel <b>${keel} m</b>` +
         (state.boat.aground ? `<br><span class="warn">⚠ AGROUND — reverse off (S)</span>` : '') +
-        `<br><span style="color:var(--dim)">${p.lat.toFixed(4)}°, ${p.lon.toFixed(4)}°</span>`;
+        `<br><span style="color:var(--dim)">${p.lat.toFixed(4)}°, ${p.lon.toFixed(4)}° · pack z${useZ}</span>`;
     } else {
       const d = state.drone;
       readout.innerHTML = `🤿 <b>Drone</b> · ${d.vel.length().toFixed(1)} m/s<br>` +
         `depth <b>${(state.tide - d.pos.y).toFixed(1)} m</b> · clearance <b>${(d.pos.y - bot).toFixed(1)} m</b><br>` +
-        `<span style="color:var(--dim)">${p.lat.toFixed(4)}°, ${p.lon.toFixed(4)}°</span>`;
+        `<span style="color:var(--dim)">${p.lat.toFixed(4)}°, ${p.lon.toFixed(4)}° · pack z${useZ}</span>`;
     }
   }
   renderer.render(scene, camera);

@@ -88,6 +88,7 @@
   can't start. The findings and receipts are all below.</div>
   <div class="hud bar">
     <div class="ctl"><span class="lbl">Mode</span>
+      <div id="levelNote" style="font-size:11.5px;color:var(--dim);margin:2px 0 6px"></div>
       <div class="seg" id="modes">
         <button data-mode="freeFly" class="on">Overview · 10 fm</button>
         <button data-mode="boat">Boat · 5 fm</button>
@@ -283,7 +284,7 @@ async function loadLevel(z, intervalFm) {
     group.add(mesh);
     tiles.push({ mesh, decoded: d });
   }));
-  const g = { group, tiles };
+  const g = { group, tiles, useZ };
   levelCache.set(z, g);
   return g;
 }
@@ -294,6 +295,9 @@ async function setMode(mode) {
   state.mode = mode;
   const { z, intervalFm } = MODES[mode];
   const g = await loadLevel(z, intervalFm);
+  document.getElementById('levelNote').textContent = g.useZ < z
+    ? `this pack serves z0–z${Math.max(...index.tiles.map(e => e.z))} · showing z${g.useZ} (mode asks z${z})`
+    : `showing z${g.useZ}`;
   terrainGroup.clear();
   terrainGroup.add(g.group);
   current = g;
