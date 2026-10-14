@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shoalwater — the game that plays itself</title>
+<meta name="description" content="A boat-and-drone game over the real bathymetry of Sitka Sound. It plays itself until you touch it — then she's yours. Work the shoal, find the Marigold's lost pot, mind the keel.">
+<style>
+  :root{
+    --bg:#0a1620; --bg2:#0e1f2e; --panel:#10293d; --line:#1e4258;
+    --ink:#dcecf5; --dim:#8fb2c6; --accent:#57c7e3; --good:#5fd68a;
+    --warn:#e8b34b; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:17px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent)}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 18px}
+  /* ---------- hero ---------- */
+  header{padding:52px 0 8px;text-align:center}
+  .kicker{color:var(--accent);font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase}
+  h1{font-size:clamp(34px,6vw,58px);line-height:1.08;margin:14px 0 10px;font-weight:800}
+  h1 .thin{color:var(--dim);font-weight:300}
+  .sub{color:var(--dim);max-width:640px;margin:0 auto;font-size:18px}
+  /* ---------- stage ---------- */
+  #stage{position:relative;margin:30px auto 0;aspect-ratio:16/10;max-height:78svh;
+    background:#071420;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  #stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:none}
+  #poster{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;text-align:center;padding:20px;
+    background:radial-gradient(120% 90% at 50% 0%, #12334a 0%, #0a1c2b 55%, #071420 100%)}
+  #poster .depth{font-family:var(--mono);color:var(--dim);font-size:12px;letter-spacing:.14em}
+  #launch{appearance:none;border:1px solid var(--accent);background:rgba(87,199,227,.12);color:var(--ink);
+    font-size:19px;font-weight:700;padding:14px 30px;border-radius:999px;cursor:pointer}
+  #launch:hover{background:rgba(87,199,227,.25)}
+  #poster p{color:var(--dim);max-width:460px;margin:0;font-size:15px}
+  .stagelinks{display:flex;gap:18px;justify-content:center;margin:12px 0 0;flex-wrap:wrap;font-size:15px}
+  /* ---------- cards ---------- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:38px 0 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+  .card h2{font-size:19px;margin:0 0 8px}
+  .card h2 .n{color:var(--accent);font-family:var(--mono);font-size:13px;display:block;letter-spacing:.18em;margin-bottom:6px}
+  .card p{color:var(--dim);margin:0;font-size:15.5px}
+  .card p b{color:var(--ink)}
+  /* ---------- controls ---------- */
+  .controls{margin:38px 0 0;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+  .controls h2{font-size:19px;margin:0 0 12px}
+  .controls table{border-collapse:collapse;width:100%;font-size:15.5px}
+  .controls td{padding:5px 10px 5px 0;vertical-align:top;color:var(--dim)}
+  .controls td.k{font-family:var(--mono);color:var(--ink);white-space:nowrap;width:170px}
+  .practice{margin-top:14px;color:var(--dim);font-size:15px}
+  /* ---------- coach ---------- */
+  .coach{margin:38px 0 0;border:1px solid var(--line);border-radius:12px;padding:24px 22px;
+    background:linear-gradient(180deg, rgba(87,199,227,.07), rgba(87,199,227,0) 60%)}
+  .coach h2{margin:0 0 8px;font-size:22px}
+  .coach p{color:var(--dim);margin:0 0 10px;max-width:760px}
+  .coach p b{color:var(--ink)}
+  footer{color:var(--dim);font-size:14px;text-align:center;padding:34px 0 44px}
+  footer a{color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="kicker">Sitka Sound · real bathymetry · a game that plays itself</div>
+    <h1>Watch her play.<br><span class="thin">Take the wheel when you're ready.</span></h1>
+    <p class="sub">Shoalwater is a boat-and-drone game drawn over the real seafloor of Sitka Sound.
+    Press launch and the boat casts off on her own — she'll work the shoal, hunt a lost crab pot,
+    and feel her way into the cove. The moment you touch a key, a stick, anything — she's yours, exactly where she floats.</p>
+  </header>
+
+  <div id="stage">
+    <div id="poster">
+      <div class="depth">57.04° N · 135.29° W — JAMESTOWN BAY</div>
+      <button id="launch">▶&nbsp; Launch the demo</button>
+      <p>She starts playing on her own a few seconds in. Watch as long as you like.
+      Taking over is not a menu — it's just touching the controls.</p>
+    </div>
+    <iframe id="game" title="Shoalwater — Explore Sitka Sound" loading="lazy"
+      allow="fullscreen" src="about:blank"></iframe>
+  </div>
+  <div class="stagelinks">
+    <a href="explore.html">Open the game full-screen ↗</a>
+    <a href="index.html">The region-pack chart</a>
+    <a href="https://github.com/SuperInstance/shoalwater">Source on GitHub</a>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <h2><span class="n">01</span>It plays itself</h2>
+      <p>The autopilot drives <b>the same controls you do</b> — same throttle, same physics, no cheats and no rails.
+      It's a real player made of code: it reads the keel depth, works the drone on a battery of thirds,
+      and creeps into shallow water the way a careful skipper would.</p>
+    </div>
+    <div class="card">
+      <h2><span class="n">02</span>Touch anything — she's yours</h2>
+      <p>Any key, tap or drag takes over <b>instantly, mid-motion</b>, wherever she lies. No pause, no handover screen.
+      When you want to watch again, the <b>▶ Watch the demo</b> button hands her back. Learning to play starts with watching her play.</p>
+    </div>
+    <div class="card">
+      <h2><span class="n">03</span>She has a job</h2>
+      <p>Scene 1: cast off, make Jamestown Bay, work the shoal with the drone — and find <b>the Marigold's lost crab pot</b>,
+      homing on its pinger. Log the wreck in the cove for the ★, then bring her home.
+      Mind the keel: two hard groundings and she's taking water.</p>
+    </div>
+  </div>
+
+  <div class="controls">
+    <h2>Controls</h2>
+    <table>
+      <tr><td class="k">W / S</td><td>throttle ahead / astern (↑ / ↓ work too)</td></tr>
+      <tr><td class="k">A / D</td><td>steer</td></tr>
+      <tr><td class="k">Space</td><td>brake — bring her to a stop</td></tr>
+      <tr><td class="k">V</td><td>swap between the boat and the drone</td></tr>
+      <tr><td class="k">R / F</td><td>drone: rise / sink</td></tr>
+      <tr><td class="k">Shift</td><td>drone boost</td></tr>
+      <tr><td class="k">touch</td><td>on-screen stick and buttons; panels fold away on small screens</td></tr>
+    </table>
+    <p class="practice">Practice one piece at a time:
+      <a href="explore.html?start=pot">start by the pot</a> ·
+      <a href="explore.html?start=jamestown">start in the bay</a> ·
+      <a href="explore.html?start=cove">start at the cove</a></p>
+  </div>
+
+  <div class="coach">
+    <h2>Where this is going: Coach Player</h2>
+    <p>This demo is the seed of something bigger. <b>Coach Player</b> turns the autopilot into an avatar with a
+    personality — one that studies how the best players play, develops its own style, narrates what it's doing,
+    and takes direction from <b>you, the coach</b>: you set the plan, nudge its dials, and grab the wheel in the tight spots.</p>
+    <p>The design is public and in progress — two independent AI design passes, a question database of what makes
+    play worth watching, and a runtime that lets the avatar write its own new moves under supervision.
+    <a href="https://github.com/SuperInstance/coach-player">Follow it on GitHub →</a></p>
+  </div>
+
+  <footer>
+    Shoalwater renders a verified bathymetric region pack of Sitka Sound, decoded in your browser.<br>
+    <a href="https://github.com/SuperInstance/shoalwater">Shoalwater</a> ·
+    <a href="https://github.com/SuperInstance/coach-player">Coach Player</a> ·
+    <a href="explore.html">Play</a>
+  </footer>
+
+</div>
+<script>
+  document.getElementById('launch').addEventListener('click', function () {
+    var f = document.getElementById('game');
+    f.src = 'explore.html';
+    f.style.display = 'block';
+    document.getElementById('poster').style.display = 'none';
+    if (f.requestFullscreen && window.innerWidth < 760) { /* stay inline on phones; fullscreen is one tap away in-game */ }
+  });
+</script>
+</body>
+</html>
