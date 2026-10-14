@@ -44,9 +44,16 @@
     left:37px; top:37px; pointer-events:none; }
   #vertBtns{ position:fixed; right:16px; bottom:150px; z-index:20; display:none; flex-direction:column; gap:10px; }
   #vertBtns button{ width:62px; height:62px; border-radius:50%; font-size:22px; }
-  #demoPill{ position:fixed; left:50%; transform:translateX(-50%); bottom:18px; z-index:30; display:none;
+  #demoPill{ position:fixed; left:50%; transform:translateX(-50%); bottom:64px; z-index:30; display:none;
     font-size:13px; white-space:nowrap; max-width:94vw; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
   @media (max-width:700px){ #demoPill{ bottom:66px; font-size:12px; } }
+  /* time acceleration: a clock setting, not a controller setting —
+     the same fixed 1/60 steps, more of them per frame */
+  #timeCtl{ position:fixed; left:50%; transform:translateX(-50%); bottom:14px; z-index:25;
+    display:flex; gap:2px; align-items:center; padding:6px 8px; }
+  #timeCtl .tcLabel{ font-size:11px; color:var(--dim); letter-spacing:.14em; text-transform:uppercase; margin-right:4px; }
+  #timeCtl button{ padding:6px 11px; font-variant-numeric:tabular-nums; }
+  #timeCtl button.active{ background:var(--accent); color:#1a1206; border-color:var(--accent); font-weight:650; }
   #minichart{ position:fixed; right:14px; bottom:16px; width:148px; height:148px; z-index:15;
     border:1px solid rgba(255,255,255,.25); border-radius:10px; background:#0b2a3a; cursor:pointer; }
   #help{ bottom:176px; }
@@ -98,6 +105,8 @@
   <button class="tideToggle" id="tideToggle" aria-expanded="true" aria-label="Hide or show tide slider"><span>Tide <span id="tideVal">+1.4</span> m</span><span class="chev">▾</span></button>
   <div id="tideBody"><input type="range" id="tide" min="-1.5" max="4" step="0.1" value="1.4" aria-label="Tide height in metres"></div>
   <button id="btnDemo">▶ Watch the demo</button>
+  <button id="btnPoles">🎣 Trolling poles: stowed</button>
+  <button id="btnVoice">🔇 Guide voice: off</button>
 </div>
 
 <div class="hud panel" id="readout" title="Tap to fold or unfold the full readout"><div id="readoutSummary"></div><div id="readoutBody">…</div></div>
@@ -109,7 +118,8 @@
 </div>
 
 <canvas id="minichart" width="148" height="148" title="Where you are — tap for the full chart"></canvas>
-<div id="demoPill" class="panel">▶ <b>DEMO</b> · <span id="demoCap">…</span> · <span style="color:var(--accent)">any key or tap — take control</span></div>
+<div id="demoPill" class="panel"><span id="pillTag">▶ <b>DEMO</b></span> · <span id="demoCap">…</span><span id="pillHint" style="color:var(--accent)"> · any key or tap — take control</span></div>
+<div id="timeCtl" class="panel"><span class="tcLabel">Time</span><button data-ts="1" class="active">1×</button><button data-ts="2">2×</button><button data-ts="4">4×</button><button data-ts="8">8×</button></div>
 <div id="stick"><div id="stickKnob"></div></div>
 <div id="vertBtns"><button id="btnUp">▲</button><button id="btnDown">▼</button></div>
 
@@ -122,6 +132,10 @@
 <script type="module">
 import * as THREE from 'three';
 import { decodeQuantizedMeshTile } from './qm.js';
+// The simulation core is shared with the headless tools (M0 extraction):
+// same physics in the page and in Node. Anchors come from the core so
+// the page, the sim and the coach runtime can never drift apart.
+import { createPack, gridFromTile, createGame, SPAWN, BAYC, WRECK, POT, STEP } from './core.js';
 
 const FM = 1.8288;
 const PACK = new URLSearchParams(location.search).get('pack') === 'demo' ? 'demo-pack' : 'real-pack';
@@ -145,48 +159,23 @@ const extent = {
   minX: Math.min(...entries.map(e => e.westX)), maxX: Math.max(...entries.map(e => e.westX + e.spanX)),
   minY: Math.min(...entries.map(e => e.southY)), maxY: Math.max(...entries.map(e => e.southY + e.spanY)),
 };
-const tileGrids = [];   // {e, grid: Float32Array(65*65)}
+const tileGrids = [];   // aligned with entries: core-built lattices
 const sceneTiles = [];
 try {
-await Promise.all(entries.map(async (e) => {
+await Promise.all(entries.map(async (e, i) => {
   const buf = await fetchRetry(`${PACK}/tiles/${e.z}/${e.x}/${e.y}.terrain`, true);
   const d = decodeQuantizedMeshTile(buf);
-  const grid = new Float32Array(65 * 65).fill(NaN);
-  for (let i = 0; i < d.vertexCount; i++) {
-    const cx = Math.round(d.u[i] / 32767 * 64), cy = Math.round(d.v[i] / 32767 * 64);
-    grid[cy * 65 + cx] = d.height[i];
-  }
-  // fill any lattice holes from the nearest filled neighbour (sparse edges)
-  for (let k = 0; k < 65 * 65; k++) if (Number.isNaN(grid[k])) {
-    const cx = k % 65, cy = (k / 65) | 0;
-    let best = Infinity, val = e.minHeight;
-    for (let j = 0; j < 65 * 65; j++) if (!Number.isNaN(grid[j])) {
-      const dd = Math.abs(j % 65 - cx) + Math.abs(((j / 65) | 0) - cy);
-      if (dd < best) { best = dd; val = grid[j]; }
-    }
-    grid[k] = val;
-  }
-  tileGrids.push({ e, grid });
+  tileGrids[i] = gridFromTile(d, e);   // the core's lattice builder (hole fill included)
   sceneTiles.push({ e, d });
 }));
 } catch (err) {
   document.getElementById('loading').textContent = 'A terrain tile failed to load — check your connection and reload the page.';
   throw err;
 }
-
-function sampleBottom(x, yEnu) {
-  for (const { e, grid } of tileGrids) {
-    if (x >= e.westX && x <= e.westX + e.spanX && yEnu >= e.southY && yEnu <= e.southY + e.spanY) {
-      const fx = (x - e.westX) / e.spanX * 64, fy = (yEnu - e.southY) / e.spanY * 64;
-      const x0 = Math.min(63, Math.floor(fx)), y0 = Math.min(63, Math.floor(fy));
-      const tx = fx - x0, ty = fy - y0;
-      const g = (cx, cy) => grid[cy * 65 + cx];
-      return g(x0, y0) * (1 - tx) * (1 - ty) + g(x0 + 1, y0) * tx * (1 - ty)
-           + g(x0, y0 + 1) * (1 - tx) * ty + g(x0 + 1, y0 + 1) * tx * ty;
-    }
-  }
-  return -60; // outside the pack: assume deep water
-}
+// The pack samples through the core's O(1) grid index now (the page's
+// old linear tile scan is gone); values are identical.
+const pack = createPack(entries, tileGrids);
+const sampleBottom = (x, yEnu) => pack.sampleBottom(x, yEnu);
 
 // ---------- scene ----------
 const stage = document.getElementById('stage');
@@ -206,11 +195,12 @@ scene.add(sun);
 const terrainGroup = new THREE.Group();
 scene.add(terrainGroup);
 const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 });
-{
+const farGroup = new THREE.Group(); farGroup.visible = false; scene.add(farGroup);
+function addTerrainMeshes(list, group) {
   const cA = new THREE.Color(0x2e7ea6), cB = new THREE.Color(0x1d5d84);
   const shallow = new THREE.Color(0x7fc4a8), wash = new THREE.Color(0x9a8f7a), pale = new THREE.Color(0xd6ecc9);
   const tmp = new THREE.Color();
-  for (const { e, d } of sceneTiles) {
+  for (const { e, d } of list) {
     const n = d.vertexCount;
     const pos = new Float32Array(n * 3);
     const colors = new Float32Array(n * 3);
@@ -230,29 +220,33 @@ const terrainMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughnes
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.setIndex(new THREE.BufferAttribute(d.indices, 1));
     geo.computeVertexNormals();
-    terrainGroup.add(new THREE.Mesh(geo, terrainMat));
+    group.add(new THREE.Mesh(geo, terrainMat));
   }
 }
-const water = new THREE.Mesh(
-  new THREE.PlaneGeometry(extent.maxX - extent.minX, extent.maxY - extent.minY),
-  new THREE.MeshStandardMaterial({ color: 0x2f7ea6, transparent: true, opacity: 0.5,
-    roughness: 0.15, metalness: 0, side: THREE.DoubleSide, depthWrite: false }));
-water.rotation.x = -Math.PI / 2;
-water.position.set((extent.minX + extent.maxX) / 2, 1.4, -(extent.minY + extent.maxY) / 2);
-scene.add(water);
+addTerrainMeshes(sceneTiles, terrainGroup);
+let water = null;
+function buildWater(minX, maxX, minY, maxY, tideY) {
+  if (water) { scene.remove(water); water.geometry.dispose(); water.material.dispose(); }
+  water = new THREE.Mesh(
+    new THREE.PlaneGeometry(maxX - minX, maxY - minY),
+    new THREE.MeshStandardMaterial({ color: 0x2f7ea6, transparent: true, opacity: 0.5,
+      roughness: 0.15, metalness: 0, side: THREE.DoubleSide, depthWrite: false }));
+  water.rotation.x = -Math.PI / 2;
+  water.position.set((minX + maxX) / 2, tideY, -(minY + maxY) / 2);
+  scene.add(water);
+}
+buildWater(extent.minX, extent.maxX, extent.minY, extent.maxY, 1.4);
 
-// Scene 1 geography (world coords: x = ENU east, z = -ENU north)
-const SPAWN = { x: 4641, z: -779 };        // Western Anchorage
-const BAYC  = { x: 8471, z: 445 };         // Jamestown Bay centre (57.0460, -135.2900)
-const WRECK = { x: 9015, z: 612 };         // the cove at the back of the bay (57.0445, -135.2810)
-const POT   = { x: 8540, z: 430 };         // the Marigold's lost pot — drainage edge east of the shoal, 5.4 m down
-let shoalTime = 0, reserveSpent = false, sceneDone = false;
-let potFound = false, potTime = 0, wreckSeen = false, hullHits = 0, takingWater = false, missionOver = false, restoredRun = false;
+// Scene 1 geography lives in core.js now (SPAWN / BAYC / WRECK / POT,
+// imported above) and the mission flags live in the core state —
+// F below is state.flags. sceneDone / restoredRun stay page-side:
+// they are presentation bookkeeping, not simulation.
+let sceneDone = false, restoredRun = false;
 const tideFollowers = [];   // instanced fleets that ride the tide
 let note = '', noteT = 0;
 function flashNote(s) { note = s; noteT = 4; }
 function pingerLine(d) {
-  if (potFound) return `<br>pot pinger: <b>LOGGED ✓</b>`;
+  if (F.potFound) return `<br>pot pinger: <b>LOGGED ✓</b>`;
   const pd = hDist(d.pos, POT);
   if (pd >= 150) return `<br>pot pinger: no return`;
   const bars = Math.max(1, Math.round((1 - pd / 150) * 8));
@@ -789,6 +783,35 @@ function drawMinichart(focus) {
   chartCtx.fillRect(5, 141, 42, 2); chartCtx.fillText('500 m', 5, 137);
 }
 
+// ---------- the far view (full-extent overview pack) ----------
+function loadFarView() {
+  fetchRetry('full-pack/tiles-index.json').then(async (fidx) => {
+    const pad = 8000, near = extent;
+    const ring = (e) => e.westX < near.maxX + pad && e.westX + e.spanX > near.minX - pad
+      && e.southY < near.maxY + pad && e.southY + e.spanY > near.minY - pad;
+    const inside = (e) => e.westX < near.maxX && e.westX + e.spanX > near.minX
+      && e.southY < near.maxY && e.southY + e.spanY > near.minY;
+    const skirt = fidx.tiles.filter((e) => e.z === 0 && ring(e) && !inside(e));
+    const built = [];
+    for (const e of skirt) {
+      try {
+        const buf = await fetchRetry(`full-pack/tiles/${e.z}/${e.x}/${e.y}.terrain`, true);
+        built.push({ e, d: decodeQuantizedMeshTile(buf) });
+      } catch (err) { /* the far view is scenery; a missing tile is a gap on the horizon, not an error */ }
+    }
+    if (!built.length) return;
+    addTerrainMeshes(built, farGroup);
+    farGroup.visible = true;
+    let u = { minX: near.minX, maxX: near.maxX, minY: near.minY, maxY: near.maxY };
+    for (const { e } of built) {
+      u.minX = Math.min(u.minX, e.westX); u.maxX = Math.max(u.maxX, e.westX + e.spanX);
+      u.minY = Math.min(u.minY, e.southY); u.maxY = Math.max(u.maxY, e.southY + e.spanY);
+    }
+    buildWater(u.minX, u.maxX, u.minY, u.maxY, water.position.y);
+    window.__farTiles = built.length;
+  }).catch(() => {});
+}
+
 // ---------- camera + HUD + loop ----------
 const readout = document.getElementById('readoutBody');
 const readoutSummary = document.getElementById('readoutSummary');
@@ -997,6 +1020,7 @@ setTimeout(() => { if (!userTouched && !demoSuppress) startDemo(); }, 2600);   /
 buildMinichart();
 document.getElementById('loading').style.display = 'none';
 animate();
+loadFarView();
 </script>
 </body>
 </html>
