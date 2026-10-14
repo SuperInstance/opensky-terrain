@@ -1,0 +1,104 @@
+{
+  "regionPackVersion": "0.1",
+  "region": {
+    "id": "sitka-sound-full-overview",
+    "name": "Sitka Sound - full extent (unified land+sea) (overview z0-z1)"
+  },
+  "boundingBox": {
+    "crs": "EPSG:4326",
+    "west": -136.4131088338165,
+    "south": 56.76388789076536,
+    "east": -135.06004388278052,
+    "north": 57.422574559827524
+  },
+  "coordinateSystems": {
+    "storage": {
+      "crs": "EPSG:4326"
+    },
+    "runtime": {
+      "frame": "ENU",
+      "origin": {
+        "lat": 57.05,
+        "lon": -135.43
+      },
+      "units": "meters"
+    }
+  },
+  "verticalDatum": {
+    "name": "MLLW",
+    "units": "meters",
+    "station": "9451600"
+  },
+  "layers": {
+    "terrain": {
+      "format": "quantized-mesh-1.0",
+      "url": "tiles/{z}/{x}/{y}.terrain"
+    },
+    "extensionsSupported": [
+      "bathymetry-bottomtype",
+      "bathymetry-confidence"
+    ]
+  },
+  "confidence": {
+    "tiers": {
+      "proMultibeam": [
+        240,
+        255
+      ],
+      "fleet": [
+        80,
+        160
+      ],
+      "interpolated": [
+        0,
+        60
+      ]
+    }
+  },
+  "contourIntervals": [
+    10,
+    5,
+    2,
+    1
+  ],
+  "contourIntervalLodMap": {
+    "10": 18.288,
+    "5": 9.144,
+    "2": 3.6576,
+    "1": 1.8288
+  },
+  "defaultByCameraMode": {
+    "freeFly": 10,
+    "boat": 5,
+    "deck": 2,
+    "auv": 1
+  },
+  "verticalExaggeration": {
+    "default": 1.0
+  },
+  "sourceProvenance": [
+    {
+      "origin": "TimeZero bathy export (owner-retained source); unified signed land+sea surface; values as exported (Mode A, datum as exported, unverified)",
+      "confidence": "fleet",
+      "licensing": "owner-retained"
+    }
+  ],
+  "license": {
+    "code": "Apache-2.0",
+    "data": "owner-retained"
+  },
+  "privacy": "public",
+  "versioning": {
+    "packVersion": "1.0.0-job1-overview",
+    "contentHash": "sha256:8bd7ef09b950808210ee584a5a56d8a3211d9ca3dc7fc42ef130ace80da0201f"
+  },
+  "derivedFrom": {
+    "parentPack": "sitka-sound-full",
+    "parentContentHash": "sha256:3e833ee3cc0d3fbd198b10e729e38e26d890974d4a39a586cd825a4fe4181521",
+    "levelsIncluded": [
+      0,
+      1
+    ],
+    "note": "Overview subset of the owner-retained full-extent pack, derived by split_pack.py (GPU Job 1 runner). Levels z2-z3 are NOT in this pack and remain owner-retained."
+  }
+}
