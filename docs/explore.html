@@ -44,6 +44,9 @@
     left:37px; top:37px; pointer-events:none; }
   #vertBtns{ position:fixed; right:16px; bottom:150px; z-index:20; display:none; flex-direction:column; gap:10px; }
   #vertBtns button{ width:62px; height:62px; border-radius:50%; font-size:22px; }
+  #demoPill{ position:fixed; left:50%; transform:translateX(-50%); bottom:18px; z-index:30; display:none;
+    font-size:13px; white-space:nowrap; max-width:94vw; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+  @media (max-width:700px){ #demoPill{ bottom:66px; font-size:12px; } }
   #vehicles button{ padding:10px 14px; }
   #vehicles input[type=range]{ height:28px; }
   a.plain{ color:var(--accent); text-decoration:none; }
@@ -91,6 +94,7 @@
   </div>
   <button class="tideToggle" id="tideToggle" aria-expanded="true" aria-label="Hide or show tide slider"><span>Tide <span id="tideVal">+1.4</span> m</span><span class="chev">▾</span></button>
   <div id="tideBody"><input type="range" id="tide" min="-1.5" max="4" step="0.1" value="1.4" aria-label="Tide height in metres"></div>
+  <button id="btnDemo">▶ Watch the demo</button>
 </div>
 
 <div class="hud panel" id="readout" title="Tap to fold or unfold the full readout"><div id="readoutSummary"></div><div id="readoutBody">…</div></div>
@@ -101,6 +105,7 @@
   <b>V</b> switch vehicle · drag right side to look · scroll to zoom cam
 </div>
 
+<div id="demoPill" class="panel">▶ <b>DEMO</b> · <span id="demoCap">…</span> · <span style="color:var(--accent)">any key or tap — take control</span></div>
 <div id="stick"><div id="stickKnob"></div></div>
 <div id="vertBtns"><button id="btnUp">▲</button><button id="btnDown">▼</button></div>
 
@@ -356,6 +361,8 @@ const fwdOf = (th) => new THREE.Vector3(-Math.sin(th), 0, -Math.cos(th));
 // ---------- input ----------
 const keys = {};
 addEventListener('keydown', (e) => {
+  idleT = 0; userTouched = true;
+  if (demo.on) stopDemo(true);
   keys[e.code] = true;
   if (e.code === 'KeyV') switchVehicle(state.vehicle === 'boat' ? 'drone' : 'boat');
   if (e.code === 'Space') e.preventDefault();
@@ -380,6 +387,8 @@ function stickCenter() { const r = stick.getBoundingClientRect(); return { x: r.
 const vertBtns = document.getElementById('vertBtns');
 let touchVert = 0;
 addEventListener('touchstart', (e) => {
+  idleT = 0; userTouched = true;
+  if (demo.on) stopDemo(true);
   for (const t of e.changedTouches) {
     const sr = stick.getBoundingClientRect();
     const onStick = t.clientX >= sr.left - 14 && t.clientX <= sr.right + 14
@@ -413,7 +422,7 @@ addEventListener('touchend', (e) => {
   }
 });
 let mouseLook = false, mouseLast = { x: 0, y: 0 };
-addEventListener('mousedown', (e) => { if (e.target === renderer.domElement) { mouseLook = true; mouseLast = { x: e.clientX, y: e.clientY }; } });
+addEventListener('mousedown', (e) => { idleT = 0; userTouched = true; if (demo.on) stopDemo(true); if (e.target === renderer.domElement) { mouseLook = true; mouseLast = { x: e.clientX, y: e.clientY }; } });
 addEventListener('mousemove', (e) => {
   if (!mouseLook) return;
   state.lookYaw -= (e.clientX - mouseLast.x) * 0.005;
@@ -432,8 +441,9 @@ for (const [id, v] of [['btnUp', 1], ['btnDown', -1]]) {
 
 // ---------- vehicle switching + controls ----------
 const btnBoat = document.getElementById('btnBoat'), btnDrone = document.getElementById('btnDrone');
-function switchVehicle(v) {
+function switchVehicle(v, fromDemo) {
   if (v === state.vehicle) return;
+  if (demo.on && !fromDemo) { stopDemo(true); return; }
   const d = state.drone, b = state.boat;
   if (v === 'drone') {
     if (d.aboard && d.battery <= 0.02) { flashNote('Drone battery flat — she charges while you run the boat.'); return; }
@@ -458,6 +468,7 @@ function switchVehicle(v) {
 }
 btnBoat.addEventListener('click', () => switchVehicle('boat'));
 btnDrone.addEventListener('click', () => switchVehicle('drone'));
+document.getElementById('btnDemo').addEventListener('click', () => startDemo());
 document.getElementById('tide').addEventListener('input', (e) => {
   state.tide = parseFloat(e.target.value);
   document.getElementById('tideVal').textContent = (state.tide >= 0 ? '+' : '') + state.tide.toFixed(1);
@@ -585,6 +596,108 @@ function stepTraffic(dt, t) {
   }
 }
 
+// ---------- the demo: the game plays itself until someone takes the conn ----------
+// The autopilot drives the same input object a player does — same physics, same
+// grounding, same battery. Captions teach the geography. Any input takes control.
+const demo = { on: false, step: 0, phase: 'go', wait: 0, stuck: 0, unstick: 0, orbit: 0, cap: '' };
+let idleT = 0, userTouched = false, demoSuppress = false;
+const demoPillEl = document.getElementById('demoPill'), demoCapEl = document.getElementById('demoCap');
+demoPillEl.addEventListener('pointerdown', () => stopDemo(true));
+function demoSay(t) { if (demo.cap !== t) { demo.cap = t; demoCapEl.textContent = t; } }
+function wrapPi(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
+function demoBoatTo(x, z, speed) {
+  const b = state.boat;
+  const dx = x - b.pos.x, dz = z - b.pos.z;
+  if (Math.hypot(dx, dz) < 16) { input.throttle = 0; input.turn = 0; return true; }
+  input.turn = THREE.MathUtils.clamp(wrapPi(Math.atan2(-dx, -dz) - b.theta) * 1.6, -1, 1);
+  input.throttle = THREE.MathUtils.clamp(speed / 6, 0.16, 0.95);
+  return false;
+}
+function demoDroneTo(x, y, z) {
+  const d = state.drone;
+  const dx = x - d.pos.x, dz = z - d.pos.z, distH = Math.hypot(dx, dz);
+  input.turn = THREE.MathUtils.clamp(wrapPi(Math.atan2(-dx, -dz) - d.theta) * 1.8, -1, 1);
+  input.throttle = distH > 5 ? 0.85 : 0.2;
+  input.vert = THREE.MathUtils.clamp((y - d.pos.y) * 0.9, -1, 1);
+  input.boost = distH > 50;
+  return distH < 5 && Math.abs(y - d.pos.y) < 0.9;
+}
+function demoSet(step) { demo.step = step; demo.phase = 'go'; demo.wait = 0; demo.stuck = 0; demo.orbit = 0; }
+function startDemo() {
+  if (demo.on) return;
+  demo.on = true; demoSet(0);
+  if (state.vehicle !== 'boat') switchVehicle('boat', true);   // the show starts on the surface
+  saveEnabled = false;   // the show is not the player's run — never persisted
+  state.camDist = Math.max(state.camDist, 16);
+  demoPillEl.style.display = 'block';
+}
+function stopDemo(tookControl) {
+  if (!demo.on) return;
+  demo.on = false;
+  input.throttle = 0; input.turn = 0; input.vert = 0; input.boost = false; input.brake = false;
+  demoPillEl.style.display = 'none';
+  saveEnabled = true; idleT = 0;
+  if (tookControl) flashNote('Your boat. W throttle · A/D steer · V takes the drone down.');
+}
+function demoControl(dt) {
+  input.brake = false;
+  const b = state.boat, d = state.drone;
+  // unstick: if she grounded or hung up under way, back off the way the game teaches
+  if (state.vehicle === 'boat' && demo.step !== 4 && demo.step !== 8) {
+    if (demo.unstick > 0) { demo.unstick -= dt; input.throttle = -0.5; input.turn = 0; return; }
+    if (Math.abs(b.speed) < 0.05 && input.throttle > 0) { demo.stuck += dt; if (demo.stuck > 2) { demo.unstick = 1.2; demo.stuck = 0; } }
+    else if (Math.abs(b.speed) >= 0.05) demo.stuck = 0;
+  }
+  switch (demo.step) {
+    case 0: demoSay('Casting off — the Western Anchorage');
+      if (demoBoatTo(5600, 150, 5.4)) demoSet(1); break;
+    case 1: demoSay('Making Jamestown Bay — four kilometres east');
+      if (demoBoatTo(7600, 380, 5.4)) demoSet(2); break;
+    case 2: demoSay('Into the bay — the pale patch is the shoal');
+      if (demoBoatTo(8300, 445, 3.2)) demoSet(3); break;
+    case 3: {   // work the shoal
+      demoSay('Working the shoal — the drone goes down to look');
+      const ty = groundAt(8380, 430) + 1.2;
+      if (demo.phase === 'go') { switchVehicle('drone', true); if (demoDroneTo(8380, ty, 430)) demo.phase = 'hold'; }
+      else if (demo.phase === 'hold') {
+        input.throttle = 0.12; input.turn = 0.1; input.boost = false;
+        input.vert = THREE.MathUtils.clamp((ty - d.pos.y) * 0.9, -1, 1);
+        demo.wait += dt; if (demo.wait > 7) demo.phase = 'back';
+      } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { switchVehicle('boat', true); demoSet(4); }
+      break; }
+    case 4: {   // creep into the cove; the keel is the instrument
+      demoSay('Feeling her way into the cove — watch the keel');
+      const bow = b.pos.clone().addScaledVector(fwdOf(b.theta), 3.4);
+      const keelBow = state.tide - groundAt(bow.x, bow.z);
+      const arrived = demoBoatTo(8957, 596, 1.3);
+      if (Math.abs(b.speed) < 0.05 && input.throttle > 0) demo.stuck += dt; else demo.stuck = 0;
+      if (arrived || keelBow < 1.35 || demo.stuck > 2.5) { input.throttle = 0; demoSet(5); }
+      break; }
+    case 5: {   // dive the wreck: an orbit, a look, and home inside the thirds
+      demoSay('The wreck — a small ship in the shallows');
+      const wy = groundAt(WRECK.x, WRECK.z) + 1.4;
+      const orbitPts = [[WRECK.x - 15, WRECK.z], [WRECK.x, WRECK.z + 15], [WRECK.x + 15, WRECK.z], [WRECK.x, WRECK.z - 15]];
+      if (demo.phase === 'go') { switchVehicle('drone', true); demo.phase = 'orbit'; }
+      else if (demo.phase === 'orbit') {
+        const [ox, oz] = orbitPts[demo.orbit];
+        if (demoDroneTo(ox, wy, oz)) { demo.orbit++; if (demo.orbit >= orbitPts.length) demo.phase = 'hold'; }
+      } else if (demo.phase === 'hold') {
+        input.throttle = 0; input.boost = false;
+        input.turn = THREE.MathUtils.clamp(wrapPi(Math.atan2(-(WRECK.x - d.pos.x), -(WRECK.z - d.pos.z)) - d.theta) * 1.8, -1, 1);
+        input.vert = THREE.MathUtils.clamp((wy - d.pos.y) * 0.9, -1, 1);
+        demo.wait += dt; if (demo.wait > 4) demo.phase = 'back';
+      } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { switchVehicle('boat', true); demoSet(6); }
+      break; }
+    case 6: demoSay('Bringing her home');
+      if (demoBoatTo(7600, 380, 5.4)) demoSet(7); break;
+    case 7:
+      if (demoBoatTo(SPAWN.x, SPAWN.z, 5.4)) demoSet(8); break;
+    case 8: demoSay('Shoalwater — this harbour is yours. Take control any time.');
+      input.throttle = 0; input.turn = 0;
+      demo.wait += dt; if (demo.wait > 12) demoSet(0); break;
+  }
+}
+
 // ---------- camera + HUD + loop ----------
 const readout = document.getElementById('readoutBody');
 const readoutSummary = document.getElementById('readoutSummary');
@@ -604,7 +717,9 @@ function animate() {
   requestAnimationFrame(animate);
   const dt = Math.min(clock.getDelta(), 0.05);
   const t = clock.elapsedTime;
-  readKeys();
+  if (demo.on) demoControl(dt); else readKeys();
+  idleT += dt;
+  if (!demo.on && !demoSuppress && idleT > 90) startDemo();   // attract: a quiet screen starts telling the story
   let vehPos, vehTheta;
   stepTraffic(dt, t);
   if (noteT > 0) noteT -= dt;
@@ -722,11 +837,13 @@ document.getElementById('resetRun').addEventListener('click', (e) => {
     state.boat.pos.set(8900, state.tide, 612);
     state.boat.theta = -1.5708;
     state.drone.pos.set(8900, state.tide - 6, 612);
+    demoSuppress = true;
     flashNote('Practice start: the wreck cove. Shallow water — and something breaks the surface to the east.');
   } else if (startParam === 'jamestown') {   // practice start: in the bay, by the shoal
     state.boat.pos.set(8200, state.tide, 445);
     state.boat.theta = -1.5708;
     state.drone.pos.set(8200, state.tide - 6, 445);
+    demoSuppress = true;
     flashNote('Practice start: Jamestown Bay. The wreck cove is east, at the back of the bay.');
   } else if (!wasReset) {
     try {
@@ -737,6 +854,7 @@ document.getElementById('resetRun').addEventListener('click', (e) => {
         state.drone.pos.set(saved.b[0], state.tide - 6, saved.b[1]);
         state.drone.battery = saved.batt; shoalTime = saved.shoalTime || 0;
         reserveSpent = !!saved.reserveSpent; sceneDone = !!saved.sceneDone;
+        demoSuppress = true;   // a run in progress is never auto-played over
         if (typeof saved.tide === 'number') {
           state.tide = saved.tide;
           document.getElementById('tide').value = saved.tide;
@@ -764,6 +882,8 @@ if (matchMedia('(max-width: 700px)').matches) {   // narrow screens start declut
   setSceneFold(true); setTideFold(true); readoutPanel.classList.add('folded');
 }
 
+if (new URLSearchParams(location.search).get('demo') === '1') demoSuppress = false;
+setTimeout(() => { if (!userTouched && !demoSuppress) startDemo(); }, 2600);   // fresh eyes get the show, hands off
 document.getElementById('loading').style.display = 'none';
 animate();
 </script>
