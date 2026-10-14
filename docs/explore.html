@@ -828,8 +828,8 @@ function animate() {
     if (noteT > 0 && note) html += `<br><span style="color:var(--accent)">${note}</span>`;
     readout.innerHTML = html;
     readoutSummary.innerHTML = state.vehicle === 'boat'
-      ? `🚤 <b>Boat</b> · depth under keel <b>${(state.tide - bot).toFixed(1)} m</b>` + (bt.aground ? ' · <span class="warn">⚠ AGROUND</span>' : '')
-      : `🤿 <b>Drone</b> · depth <b>${(state.tide - d.pos.y).toFixed(1)} m</b>` + (d.dead ? ' · <span class="warn">BATTERY SPENT</span>' : d.battery < 1 / 3 ? ' · <span class="warn">⚠ RESERVE</span>' : '');
+      ? `🚤 <b>Boat</b> · depth under keel <b>${(state.tide - bot).toFixed(1)} m</b>` + (bt.aground ? ' · <span class="warn">⚠ AGROUND</span>' : '') + (takingWater ? ' · <span class="warn">TAKING WATER</span>' : '')
+      : `🤿 <b>Drone</b> · depth <b>${(state.tide - d.pos.y).toFixed(1)} m</b>` + (d.dead ? ' · <span class="warn">BATTERY SPENT</span>' : d.battery < 1 / 3 ? ' · <span class="warn">⚠ RESERVE</span>' : '') + (potFound ? ' · pot ✓ logged' : hDist(d.pos, POT) < 150 ? ` · pot ${Math.round(hDist(d.pos, POT))} m` : '');
     // Scene 1 — a job of work: the Marigold's lost pot
     if (!wreckSeen && hDist(d.pos, WRECK) < 18 && Math.abs(d.pos.y - (groundAt(WRECK.x, WRECK.z) + 1)) < 8 && !d.aboard) wreckSeen = true;
     if (takingWater && !missionOver && hDist(bt.pos, SPAWN) < 60) { missionOver = true; flashNote('Limped home. The yard will have her a week — reset and run it cleaner.'); }
