@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shoalwater — Deployment 1: the full Sound, baked</title>
+<meta name="description" content="On 14 October 2026 the whole of Sitka Sound — 50,745,068 soundings — was baked into the full-extent Shoalwater pack on a laptop GPU in Sitka. Receipts, renders, and an honest account of what is and is not deployed yet.">
+<style>
+  :root{
+    --bg:#0a1620; --bg2:#0e1f2e; --panel:#10293d; --line:#1e4258;
+    --ink:#dcecf5; --dim:#8fb2c6; --accent:#57c7e3; --good:#5fd68a;
+    --warn:#e8b34b; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:17px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent)}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 18px}
+  header{padding:52px 0 8px;text-align:center}
+  .kicker{color:var(--accent);font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase}
+  h1{font-size:clamp(32px,5.4vw,52px);line-height:1.1;margin:14px 0 10px;font-weight:800}
+  h1 .thin{color:var(--dim);font-weight:300}
+  .sub{color:var(--dim);max-width:680px;margin:0 auto;font-size:18px}
+  figure{margin:30px 0 0}
+  figure img{width:100%;border:1px solid var(--line);border-radius:14px;display:block}
+  figcaption{color:var(--dim);font-size:14.5px;text-align:center;margin-top:10px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:38px 0 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+  .card h2{font-size:19px;margin:0 0 8px}
+  .card h2 .n{color:var(--accent);font-family:var(--mono);font-size:13px;display:block;letter-spacing:.18em;margin-bottom:6px}
+  .card p{color:var(--dim);margin:0;font-size:15.5px}
+  .card p b{color:var(--ink)}
+  .receipts{margin:38px 0 0;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+  .receipts h2{font-size:19px;margin:0 0 12px}
+  .receipts table{border-collapse:collapse;width:100%;font-size:15.5px}
+  .receipts td{padding:5px 10px 5px 0;vertical-align:top;color:var(--dim)}
+  .receipts td.k{font-family:var(--mono);color:var(--ink);white-space:nowrap;width:190px}
+  .honest{margin:38px 0 0;border:1px solid var(--line);border-radius:12px;padding:24px 22px;
+    background:linear-gradient(180deg, rgba(232,179,75,.06), rgba(232,179,75,0) 60%)}
+  .honest h2{margin:0 0 8px;font-size:22px}
+  .honest p{color:var(--dim);margin:0 0 10px;max-width:780px}
+  .honest p b{color:var(--ink)}
+  footer{color:var(--dim);font-size:14px;text-align:center;padding:34px 0 44px}
+  footer a{color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Shoalwater · Deployment 1 · 14 October 2026</div>
+  <h1>The whole Sound, <span class="thin">baked on a laptop</span></h1>
+  <p class="sub">Until now the public explorer sailed a clip of Sitka Sound. Today the full
+  extent — <b>50,745,068 soundings</b> — went through the pipeline on an RTX 4050 laptop
+  GPU in Sitka and came out the other side as a verified chart pack. These are its receipts.</p>
+</header>
+
+<figure>
+  <img src="media/sitka-sound-master-web.png" alt="Hillshade render of the full-extent Sitka Sound bathymetry, built from 50.7 million soundings">
+  <figcaption>The full extent, rendered from the baked grid (web size). The master at 7680 × 5883 stays with the owner.</figcaption>
+</figure>
+
+<div class="cards">
+  <div class="card">
+    <h2><span class="n">Stage 1</span>The grid</h2>
+    <p><b>50,745,068 soundings</b> folded into one signed grid at 25 m —
+    3,277 × 2,933 cells covering the whole survey extent, depths from
+    −1,279.9 m to +119.8 m. <b>47.6 seconds.</b></p>
+  </div>
+  <div class="card">
+    <h2><span class="n">Stage 2</span>The pack</h2>
+    <p><b>3,266 tiles</b> baked across four zoom levels. Every tile was decoded
+    back and checked; the validator passed on the full pack and the overview.
+    A public-safety audit of the publishable tree found <b>zero violations</b> —
+    no fine tiles, no raw grid.</p>
+  </div>
+  <div class="card">
+    <h2><span class="n">Stage 3</span>The pictures</h2>
+    <p>The beauty pass ran its hillshade engine — the ray-traced renderer
+    is not on the machine yet, and the page says so rather than dressing
+    the fallback up. Masters are owner-retained; the web sizes are here.</p>
+  </div>
+</div>
+
+<div class="receipts">
+  <h2>Receipts</h2>
+  <table>
+    <tr><td class="k">Machine</td><td>ProArt laptop, RTX 4050 (6 GB), WSL — the same laptop the fleet's resident loop trains on</td></tr>
+    <tr><td class="k">Input</td><td>50,745,068 soundings · lon −136.413…−135.060 · lat 56.764…57.422 · 2,238,893,007 bytes as exported</td></tr>
+    <tr><td class="k">Stage 1 — grid</td><td>47.56 s · grid 3,277 × 2,933 · inventory exact against the source file</td></tr>
+    <tr><td class="k">Stage 2 — pack</td><td>115.05 s · 3,266 tiles (z0 42 · z1 156 · z2 624 · z3 2,444) · 262,155,576 bytes · all tiles decode-verified · validator PASS</td></tr>
+    <tr><td class="k">Overview</td><td>198 tiles (z0+z1) · 15,435,024 bytes · content hash sha256:8bd7ef09b950808210ee584a5a56d8a3211d9ca3dc7fc42ef130ace80da0201f</td></tr>
+    <tr><td class="k">Stage 3 — beauty</td><td>hillshade fallback (no Blender on the box) · master 7680 × 5883 owner-retained · web 1920 × 1471 published here</td></tr>
+    <tr><td class="k">Split</td><td>public-safe 19,694,333 bytes · owner-retained 478,453,096 bytes — the full-resolution pack has not been published</td></tr>
+  </table>
+</div>
+
+<figure>
+  <img src="media/jamestown-bay-closeup-web.png" alt="Close-up hillshade render of the Jamestown Bay area from the full-extent grid">
+  <figcaption>Close-up from the same grid (web size) — the detail is real; the fine tiles behind it stay owner-retained until the datum work is done.</figcaption>
+</figure>
+
+<div class="honest">
+  <h2>Are we there yet? No — and here is exactly where "there" stands</h2>
+  <p><b>What is deployed:</b> the full-extent pack exists, is verified tile by tile, and its
+  overview and pictures are on this page. The bake is no longer the bottleneck — the whole
+  job took under four minutes of GPU time.</p>
+  <p><b>What is not deployed yet:</b> the playable explorer still sails the earlier Sitka clip;
+  wiring it to the full pack is the next job, not a done one. The depths are <b>as exported</b> —
+  the export's datum and tide handling are still unverified, so nothing here is a chart you
+  should navigate by. And the beauty master is a hillshade, not the ray-traced render the
+  pipeline specced, because the renderer is not installed on the laptop yet.</p>
+  <p>Early times, then — but the early part that remains is wiring and verification,
+  not invention. The mountain of soundings is a chart pack now.</p>
+</div>
+
+<footer>
+  <p><a href="play.html">Play the demo</a> · <a href="explore.html">Open the explorer</a> ·
+  <a href="https://github.com/SuperInstance/shoalwater">SuperInstance/shoalwater</a></p>
+  <p>Deployment 1 · baked 14 October 2026 · receipts kept with the run</p>
+</footer>
+
+</div>
+</body>
+</html>
