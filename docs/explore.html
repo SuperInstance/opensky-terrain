@@ -336,12 +336,12 @@ const hDist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 // untouched — this is a reskin, and the trolling poles are a visual
 // group on the boat with zero physics presence.
 function namePlate() {
-  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 72;
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 144;
   const cx = cv.getContext('2d');
-  cx.font = '700 42px Georgia, serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
-  cx.fillStyle = '#16303e'; cx.fillText('EILEEN', 128, 38);
+  cx.font = '700 84px Georgia, serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.fillStyle = '#16303e'; cx.fillText('EILEEN', 256, 76);
   const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
-  return new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.42),
+  return new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.48),
     new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
 }
 function stay(x1, y1, z1, x2, y2, z2, mat) {
@@ -352,20 +352,58 @@ function stay(x1, y1, z1, x2, y2, z2, mat) {
   m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.sub(a).normalize());
   return m;
 }
+// a gurdy: one of the pair of spool drums on the aft face of the
+// house that the trolling gear hauls on — axle athwartships, two
+// flanges, a drum between them.
+function gurdy() {
+  const grp = new THREE.Group();
+  const steel = new THREE.MeshStandardMaterial({ color: 0x46525a, roughness: 0.45, metalness: 0.55 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2c3438, roughness: 0.6 });
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.2, 16), steel);
+  drum.rotation.z = Math.PI / 2; grp.add(drum);
+  for (const fx of [-0.13, 0.13]) {
+    const fl = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.045, 16), dark);
+    fl.rotation.z = Math.PI / 2; fl.position.x = fx; grp.add(fl);
+  }
+  return grp;
+}
+// trolling-pole geometry shared by the builder and the animator
+const POLE_LEN = 4.8, LINE_SEG = 8, WATER_Y = -0.2;
 function buildBoat(withName = true) {
   const g = new THREE.Group();
   const white = new THREE.MeshStandardMaterial({ color: 0xf0f3f0, roughness: 0.6 });
   const black = new THREE.MeshStandardMaterial({ color: 0x14181a, roughness: 0.8 });
   const wood = new THREE.MeshStandardMaterial({ color: 0x6e5136, roughness: 0.85 });
   const glass = new THREE.MeshStandardMaterial({ color: 0x18222a, roughness: 0.25, metalness: 0.3 });
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 6.4), white);   // topsides
-  hull.position.y = 0.15; g.add(hull);
+  // topsides, split at z=1.1: forward of that the deck is whole;
+  // aft of it the deck drops into the cockpit pit, so the aft
+  // section is two side strips and a transom strip around a floor
+  // 0.5 m below the sheer. Same outline, same bow line — the
+  // footprint the physics knows is unchanged.
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 4.3), white);   // topsides, forward
+  hull.position.set(0, 0.15, -1.05); g.add(hull);
+  for (const sx of [-1, 1]) {
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.0, 2.1), white);
+    strip.position.set(sx * 1.025, 0.15, 2.15); g.add(strip);
+  }
+  const transom = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.0, 0.15), white);
+  transom.position.set(0, 0.15, 3.125); g.add(transom);
+  const pitFloor = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.08, 2.1), wood);
+  pitFloor.position.set(0, 0.11, 2.15); g.add(pitFloor);
   const bow = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 1.1, 2.2, 4), white);
   bow.rotation.set(Math.PI / 2, Math.PI / 4, 0); bow.position.set(0, 0.15, -4.2); bow.scale.set(1, 1, 0.45); g.add(bow);
   const bottom = new THREE.Mesh(new THREE.BoxGeometry(2.24, 0.5, 6.44), black);   // black bottom under white topsides
   bottom.position.y = -0.3; g.add(bottom);
-  const rail = new THREE.Mesh(new THREE.BoxGeometry(2.34, 0.09, 6.5), wood);      // cap rail on the sheer
-  rail.position.y = 0.68; g.add(rail);
+  // cap rail on the sheer, split to match the pit: full width
+  // forward, side and transom strips around the cockpit opening.
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(2.34, 0.09, 4.35), wood);
+  rail.position.set(0, 0.68, -1.075); g.add(rail);
+  for (const sx of [-1, 1]) {
+    const rstrip = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.09, 2.15), wood);
+    rstrip.position.set(sx * 1.06, 0.68, 2.175); g.add(rstrip);
+  }
+  const railT = new THREE.Mesh(new THREE.BoxGeometry(1.96, 0.09, 0.19), wood);
+  railT.position.set(0, 0.68, 3.155); g.add(railT);
   const bulwark = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.34, 1.7), white);    // raised bow — the high, flared head
   bulwark.position.set(0, 0.82, -2.5); g.add(bulwark);
   // pilothouse set forward, window band all round the face
@@ -385,11 +423,48 @@ function buildBoat(withName = true) {
   g.add(stay(0, 4.45, 0.6, 0, 0.8, -4.9, stayMat));
   g.add(stay(0, 4.45, 0.6, -0.95, 0.75, 3.05, stayMat));
   g.add(stay(0, 4.45, 0.6, 0.95, 0.75, 3.05, stayMat));
-  // working deck aft: hatch and the round fender buoys on the rail —
-  // green pair on the port rail, one red to starboard (per the refs)
-  const hatch = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.25, 1.5),
+  // the rest of the fan: shrouds from the cross-tree ends down to
+  // the rails, and masthead stays out to the bow quarters — the
+  // working web the film shows, not a bare pole with three lines.
+  g.add(stay(-0.85, 3.9, 0.6, -1.08, 0.7, 0.9, stayMat));
+  g.add(stay(0.85, 3.9, 0.6, 1.08, 0.7, 0.9, stayMat));
+  g.add(stay(0, 4.45, 0.6, -0.75, 0.8, -3.6, stayMat));
+  g.add(stay(0, 4.45, 0.6, 0.75, 0.8, -3.6, stayMat));
+  // mast ladder: rails and rungs up the aft face of the mast, and
+  // a lower spreader bar — the stills show climbed rigging.
+  for (const rx of [-0.18, 0.18]) {
+    const lr = new THREE.Mesh(new THREE.BoxGeometry(0.04, 2.5, 0.04), stayMat);
+    lr.position.set(rx, 2.5, 0.71); g.add(lr);
+  }
+  for (let ry = 1.35; ry <= 3.75; ry += 0.4) {
+    const rung = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.045, 0.045), stayMat);
+    rung.position.set(0, ry, 0.71); g.add(rung);
+  }
+  const spreader = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.05, 0.05), wood);
+  spreader.position.set(0, 2.95, 0.6); g.add(spreader);
+  // the gurdies: the pair of spool drums on the aft face of the
+  // house that the trolling gear hauls on.
+  for (const gx of [-0.48, 0.48]) { const gd = gurdy(); gd.position.set(gx, 1.02, -0.18); g.add(gd); }
+  // the cockpit's hold hatch: a low coaming and lid in the pit,
+  // where the deck hatch used to sit proud of the old flat deck.
+  const coaming = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.2, 1.36),
     new THREE.MeshStandardMaterial({ color: 0x77828a, roughness: 0.8 }));
-  hatch.position.set(0, 0.85, 2.0); g.add(hatch);
+  coaming.position.set(0, 0.25, 2.4); g.add(coaming);
+  const lid = new THREE.Mesh(new THREE.BoxGeometry(1.26, 0.06, 1.46),
+    new THREE.MeshStandardMaterial({ color: 0x8b979e, roughness: 0.8 }));
+  lid.position.set(0, 0.38, 2.4); g.add(lid);
+  // the canopy over the forward pit: a flat roof on slim posts,
+  // the shaded working pit the film shows. Kept short enough
+  // forward that the quarter backstays clear its aft edge.
+  const canopy = new THREE.Mesh(new THREE.BoxGeometry(2.06, 0.06, 1.3),
+    new THREE.MeshStandardMaterial({ color: 0x9aa4a8, roughness: 0.7 }));
+  canopy.position.set(0, 1.82, 1.7); g.add(canopy);
+  const postGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.17);
+  for (const [px, pz] of [[-0.98, 1.2], [0.98, 1.2], [-0.98, 2.2], [0.98, 2.2]]) {
+    const post = new THREE.Mesh(postGeo, stayMat); post.position.set(px, 1.24, pz); g.add(post);
+  }
+  // working deck aft: the round fender buoys on the rail —
+  // green pair on the port rail, one red to starboard (per the refs)
   const buoyGeo = new THREE.SphereGeometry(0.27, 12, 10);
   const green = new THREE.MeshStandardMaterial({ color: 0x2e7d4f, roughness: 0.55 });
   const red = new THREE.MeshStandardMaterial({ color: 0xb03030, roughness: 0.55 });
@@ -400,33 +475,85 @@ function buildBoat(withName = true) {
     const port = namePlate(); port.position.set(-1.11, 0.3, -2.2); port.rotation.y = -Math.PI / 2; g.add(port);
     const stbd = namePlate(); stbd.position.set(1.11, 0.3, -2.2); stbd.rotation.y = Math.PI / 2; g.add(stbd);
   }
-  // TROLLING POLES — hinged at the mast base. Stowed: up alongside
-  // the mast. Deployed: swung down and out over the quarters.
+  // TROLLING POLES — hinged LOW on posts in the forward cockpit,
+  // near deck level, the way the film shows them. Stowed: raised
+  // vertical at the quarters. Deployed: swung up and out into a
+  // wide V, tips well outside the beam (see applyPoles for the
+  // angles). Each pole carries a fishing line rendered as a slack
+  // curve — nearly straight to the water when deployed, bellied
+  // in a slack droop to a deck point at the quarter when stowed.
   // Purely visual; animated by the page, unknown to the physics.
-  const poleHinges = [];
+  const poleHinges = [], tipLines = [];
+  const lineMat = new THREE.LineBasicMaterial({ color: 0x22282c, transparent: true, opacity: 0.85 });
   for (const side of [-1, 1]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.57, 0.14), wood);
+    post.position.set(side * 0.8, 0.44, 1.5); g.add(post);
     const hinge = new THREE.Group();
-    hinge.position.set(side * 0.3, 1.0, 0.6);
-    const poleGeo = new THREE.CylinderGeometry(0.032, 0.05, 4.8); poleGeo.translate(0, 2.4, 0);
+    hinge.position.set(side * 0.8, 0.72, 1.5);
+    const poleGeo = new THREE.CylinderGeometry(0.032, 0.05, POLE_LEN); poleGeo.translate(0, POLE_LEN / 2, 0);
     const pole = new THREE.Mesh(poleGeo, wood); hinge.add(pole);
     const tipGeo = new THREE.SphereGeometry(0.06, 8, 6);
-    const tip = new THREE.Mesh(tipGeo, stayMat); tip.position.y = 4.8; hinge.add(tip);
+    const tip = new THREE.Mesh(tipGeo, stayMat); tip.position.y = POLE_LEN; hinge.add(tip);
     hinge.rotation.z = side * 0.05;
     hinge.userData.side = side;
     g.add(hinge); poleHinges.push(hinge);
+    const lineGeo = new THREE.BufferGeometry();
+    lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array((LINE_SEG + 1) * 3), 3));
+    const line = new THREE.Line(lineGeo, lineMat);
+    line.frustumCulled = false;
+    g.add(line);
+    const entry = { geo: lineGeo, side, deck: new THREE.Vector3(side * 1.0, 0.7, 2.9) };
+    tipLines.push(entry);
+    updateTipLine(entry, 0, poleTipLocal(hinge));
   }
   g.userData.poleHinges = poleHinges;
+  g.userData.tipLines = tipLines;
   return g;
 }
 // pole swing state (page-side, visual only): 0 = stowed, 1 = deployed
 const poles = { a: 0, target: 0 };
+// a hinge's pole-tip position in boat-local space, read off its
+// live rotation matrix — exact whatever the Euler conventions are.
+function poleTipLocal(hinge) {
+  hinge.updateMatrix();
+  return new THREE.Vector3(0, POLE_LEN, 0).applyMatrix4(hinge.matrix);
+}
+// One pole's fishing line, drawn as a slack curve, never a taut
+// straight segment. Deployed, it runs from the tip down to the
+// water nearly straight under load (sag 0.12 m). Stowed, it runs
+// from the raised tip down to its deck attachment at the quarter
+// with a pronounced belly (sag 0.7 m, lowest midway) — the slack
+// hang that lets the boat pull into its slip without fouling
+// anything. Endpoint and sag both travel with the swing.
+function updateTipLine(entry, a, tip) {
+  const pos = entry.geo.attributes.position;
+  const ex = entry.deck.x + (tip.x - entry.deck.x) * a;
+  const ey = entry.deck.y + (WATER_Y - entry.deck.y) * a;
+  const ez = entry.deck.z + (tip.z - entry.deck.z) * a;
+  const sag = 0.7 + (0.12 - 0.7) * a;
+  for (let i = 0; i <= LINE_SEG; i++) {
+    const t = i / LINE_SEG;
+    pos.setXYZ(i,
+      tip.x + (ex - tip.x) * t,
+      tip.y + (ey - tip.y) * t - sag * 4 * t * (1 - t),
+      tip.z + (ez - tip.z) * t);
+  }
+  pos.needsUpdate = true;
+}
 function applyPoles(dt) {
   const rate = dt / 1.5;   // ~1.5 s swing
   poles.a += THREE.MathUtils.clamp(poles.target - poles.a, -rate, rate);
-  for (const h of boatMesh.userData.poleHinges) {
-    const side = h.userData.side;
-    h.rotation.z = side * (0.05 - poles.a * 1.17);
-    h.rotation.x = poles.a * 0.55;
+  const hinges = boatMesh.userData.poleHinges, lines = boatMesh.userData.tipLines;
+  for (let i = 0; i < hinges.length; i++) {
+    const h = hinges[i], side = h.userData.side;
+    // Deployed pose, per the film: hinged low, the poles angle UP
+    // and OUT at 40° above horizontal with a slight aft rake
+    // (0.30 rad about x), forming the wide symmetric V seen from
+    // astern. (0.883 rad of z-swing from the 0.05 stowed lean
+    // lands the pole at exactly that elevation and rake.)
+    h.rotation.z = side * (0.05 - poles.a * 0.883);
+    h.rotation.x = poles.a * 0.30;
+    updateTipLine(lines[i], poles.a, poleTipLocal(h));
   }
 }
 function buildDrone() {
@@ -848,7 +975,7 @@ function togglePoles() {
   poles.target = poles.target ? 0 : 1;
   btnPoles.textContent = poles.target ? '🎣 Trolling poles: deployed' : '🎣 Trolling poles: stowed';
   btnPoles.classList.toggle('active', !!poles.target);
-  flashNote(poles.target ? 'Poles down — gear over the quarters.' : 'Poles up — stowed alongside the mast.');
+  flashNote(poles.target ? 'Poles out — gear in the water, lines down.' : 'Poles up — stowed, lines slack to the quarters.');
   cancelSpeech();
 }
 btnPoles.addEventListener('click', togglePoles);
