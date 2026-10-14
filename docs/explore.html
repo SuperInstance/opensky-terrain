@@ -324,24 +324,105 @@ const hDist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 }
 
 // ---------- vehicles ----------
-function buildBoat() {
+// The player's boat is F/V Eileen — Casey's Sitka power troller
+// (refs in repo refs/: cutaway, side profile, keel). Classic wooden
+// troller silhouette inside the old boat's envelope: same length,
+// beam and bow line, so handling and the +3.4 m bow probe are
+// untouched — this is a reskin, and the trolling poles are a visual
+// group on the boat with zero physics presence.
+function namePlate() {
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 72;
+  const cx = cv.getContext('2d');
+  cx.font = '700 42px Georgia, serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.fillStyle = '#16303e'; cx.fillText('EILEEN', 128, 38);
+  const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
+  return new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.42),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+}
+function stay(x1, y1, z1, x2, y2, z2, mat) {
+  const a = new THREE.Vector3(x1, y1, z1), b = new THREE.Vector3(x2, y2, z2);
+  const len = a.distanceTo(b);
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, len), mat);
+  m.position.copy(a).lerp(b, 0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.sub(a).normalize());
+  return m;
+}
+function buildBoat(withName = true) {
   const g = new THREE.Group();
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 6.4),
-    new THREE.MeshStandardMaterial({ color: 0xdfe6ea, roughness: 0.6 }));
+  const white = new THREE.MeshStandardMaterial({ color: 0xf0f3f0, roughness: 0.6 });
+  const black = new THREE.MeshStandardMaterial({ color: 0x14181a, roughness: 0.8 });
+  const wood = new THREE.MeshStandardMaterial({ color: 0x6e5136, roughness: 0.85 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x18222a, roughness: 0.25, metalness: 0.3 });
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 6.4), white);   // topsides
   hull.position.y = 0.15; g.add(hull);
-  const bow = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 1.1, 2.2, 4),
-    new THREE.MeshStandardMaterial({ color: 0xdfe6ea, roughness: 0.6 }));
+  const bow = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 1.1, 2.2, 4), white);
   bow.rotation.set(Math.PI / 2, Math.PI / 4, 0); bow.position.set(0, 0.15, -4.2); bow.scale.set(1, 1, 0.45); g.add(bow);
-  const keel = new THREE.Mesh(new THREE.BoxGeometry(2.24, 0.35, 6.44),
-    new THREE.MeshStandardMaterial({ color: 0xa33327, roughness: 0.7 }));
-  keel.position.y = -0.3; g.add(keel);
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.15, 2.4),
-    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5 }));
-  cabin.position.set(0, 1.2, 0.4); g.add(cabin);
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 3.4),
-    new THREE.MeshStandardMaterial({ color: 0x555f66 }));
-  mast.position.set(0, 2.6, -1.4); g.add(mast);
+  const bottom = new THREE.Mesh(new THREE.BoxGeometry(2.24, 0.5, 6.44), black);   // black bottom under white topsides
+  bottom.position.y = -0.3; g.add(bottom);
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(2.34, 0.09, 6.5), wood);      // cap rail on the sheer
+  rail.position.y = 0.68; g.add(rail);
+  const bulwark = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.34, 1.7), white);    // raised bow — the high, flared head
+  bulwark.position.set(0, 0.82, -2.5); g.add(bulwark);
+  // pilothouse set forward, window band all round the face
+  const house = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.25, 2.1), white);
+  house.position.set(0, 1.32, -1.5); g.add(house);
+  const band = new THREE.Mesh(new THREE.BoxGeometry(1.86, 0.42, 2.16), glass);
+  band.position.set(0, 1.6, -1.5); g.add(band);
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.09, 2.4),
+    new THREE.MeshStandardMaterial({ color: 0x9aa4a8, roughness: 0.7 }));
+  roof.position.set(0, 2.0, -1.5); g.add(roof);
+  // one tall mast aft of the house, cross-tree, forestay and backstays
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 3.8), wood);
+  mast.position.set(0, 2.6, 0.6); g.add(mast);
+  const crosstree = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.06, 0.06), wood);
+  crosstree.position.set(0, 3.9, 0.6); g.add(crosstree);
+  const stayMat = new THREE.MeshStandardMaterial({ color: 0x2c3438, roughness: 0.6 });
+  g.add(stay(0, 4.45, 0.6, 0, 0.8, -4.9, stayMat));
+  g.add(stay(0, 4.45, 0.6, -0.95, 0.75, 3.05, stayMat));
+  g.add(stay(0, 4.45, 0.6, 0.95, 0.75, 3.05, stayMat));
+  // working deck aft: hatch and the round fender buoys on the rail —
+  // green pair on the port rail, one red to starboard (per the refs)
+  const hatch = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.25, 1.5),
+    new THREE.MeshStandardMaterial({ color: 0x77828a, roughness: 0.8 }));
+  hatch.position.set(0, 0.85, 2.0); g.add(hatch);
+  const buoyGeo = new THREE.SphereGeometry(0.27, 12, 10);
+  const green = new THREE.MeshStandardMaterial({ color: 0x2e7d4f, roughness: 0.55 });
+  const red = new THREE.MeshStandardMaterial({ color: 0xb03030, roughness: 0.55 });
+  for (const [x, z, m] of [[-1.2, 1.4, green], [-1.2, 2.5, green], [1.2, 1.95, red]]) {
+    const buoy = new THREE.Mesh(buoyGeo, m); buoy.position.set(x, 0.32, z); g.add(buoy);
+  }
+  if (withName) {
+    const port = namePlate(); port.position.set(-1.11, 0.3, -2.2); port.rotation.y = -Math.PI / 2; g.add(port);
+    const stbd = namePlate(); stbd.position.set(1.11, 0.3, -2.2); stbd.rotation.y = Math.PI / 2; g.add(stbd);
+  }
+  // TROLLING POLES — hinged at the mast base. Stowed: up alongside
+  // the mast. Deployed: swung down and out over the quarters.
+  // Purely visual; animated by the page, unknown to the physics.
+  const poleHinges = [];
+  for (const side of [-1, 1]) {
+    const hinge = new THREE.Group();
+    hinge.position.set(side * 0.3, 1.0, 0.6);
+    const poleGeo = new THREE.CylinderGeometry(0.032, 0.05, 4.8); poleGeo.translate(0, 2.4, 0);
+    const pole = new THREE.Mesh(poleGeo, wood); hinge.add(pole);
+    const tipGeo = new THREE.SphereGeometry(0.06, 8, 6);
+    const tip = new THREE.Mesh(tipGeo, stayMat); tip.position.y = 4.8; hinge.add(tip);
+    hinge.rotation.z = side * 0.05;
+    hinge.userData.side = side;
+    g.add(hinge); poleHinges.push(hinge);
+  }
+  g.userData.poleHinges = poleHinges;
   return g;
+}
+// pole swing state (page-side, visual only): 0 = stowed, 1 = deployed
+const poles = { a: 0, target: 0 };
+function applyPoles(dt) {
+  const rate = dt / 1.5;   // ~1.5 s swing
+  poles.a += THREE.MathUtils.clamp(poles.target - poles.a, -rate, rate);
+  for (const h of boatMesh.userData.poleHinges) {
+    const side = h.userData.side;
+    h.rotation.z = side * (0.05 - poles.a * 1.17);
+    h.rotation.x = poles.a * 0.55;
+  }
 }
 function buildDrone() {
   const g = new THREE.Group();
@@ -367,27 +448,41 @@ function buildDrone() {
 const boatMesh = buildBoat(); scene.add(boatMesh);
 const droneMesh = buildDrone(); scene.add(droneMesh);
 
-const state = {
-  vehicle: 'boat', tide: 1.4, exagg: 1,
-  boat: { pos: new THREE.Vector3(4641, 1.4, -779), theta: 1.5708, speed: 0, aground: false },  // Western Anchorage, off Thomsen Harbor, facing out past Channel Rock
-  drone: { pos: new THREE.Vector3(4641, -4.6, -779), theta: 1.5708, vel: new THREE.Vector3(),
-           battery: 1, aboard: true, diveMin: 1, dead: false },
-  camDist: 12, lookYaw: 0, lookPitch: 0,
-};
-const groundAt = (x, z) => sampleBottom(x, -z) * state.exagg;
+// The game itself is the core's now — the page renders core state and
+// writes the core's one input object. Camera state stays page-side:
+// it was never simulation.
+const game = createGame(pack);
+const state = game.state;
+const F = state.flags;
+const input = game.input;
+const groundAt = game.groundAt;
+const cam = { dist: 12, yaw: 0, pitch: 0 };
 const fwdOf = (th) => new THREE.Vector3(-Math.sin(th), 0, -Math.cos(th));
+// Core events (notes, strikes, recoveries) surface as flash notes.
+function drainEvents() {
+  for (const e of game.events.splice(0)) if (e.type === 'note') flashNote(e.text);
+}
 
 // ---------- input ----------
 const keys = {};
+// Takeover scope: only genuine control keys take the conn. Typing in
+// a form field (the future coach box, the tide slider's cousins)
+// must neither steal the demo nor be stolen from — a keydown whose
+// target sits inside an input/textarea is not the game's at all.
+const CONTROL_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD',
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  'KeyR', 'KeyF', 'KeyV', 'KeyT', 'Space', 'ShiftLeft', 'ShiftRight']);
 addEventListener('keydown', (e) => {
-  idleT = 0; userTouched = true;
-  if (demo.on) stopDemo(true);
+  if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
   keys[e.code] = true;
-  if (e.code === 'KeyV') switchVehicle(state.vehicle === 'boat' ? 'drone' : 'boat');
+  if (!CONTROL_KEYS.has(e.code)) return;
+  idleT = 0; userTouched = true; markInteracted();
+  if (demo.on) stopDemo(true);
+  if (e.code === 'KeyV') uiSwitchVehicle(state.vehicle === 'boat' ? 'drone' : 'boat', 'player');
+  if (e.code === 'KeyT') togglePoles();
   if (e.code === 'Space') e.preventDefault();
 });
 addEventListener('keyup', (e) => keys[e.code] = false);
-const input = { throttle: 0, turn: 0, vert: 0, boost: false, brake: false };
 function readKeys() {
   if (stickId === null) {  // the touch joystick owns throttle/turn while active
     input.throttle = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
@@ -404,10 +499,9 @@ const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
 if (IS_TOUCH) stick.style.display = 'block';
 function stickCenter() { const r = stick.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
 const vertBtns = document.getElementById('vertBtns');
-let touchVert = 0;
 addEventListener('touchstart', (e) => {
-  idleT = 0; userTouched = true;
-  if (demo.on) stopDemo(true);
+  idleT = 0; userTouched = true; markInteracted();
+  if (demo.on && !(e.target.closest && e.target.closest('.hud, #timeCtl'))) stopDemo(true);
   for (const t of e.changedTouches) {
     const sr = stick.getBoundingClientRect();
     const onStick = t.clientX >= sr.left - 14 && t.clientX <= sr.right + 14
@@ -428,8 +522,8 @@ addEventListener('touchmove', (e) => {
       input.turn = -dz(dx) * 0.75;                     // gentler steering gain
       input.throttle = -dz(dy);
     } else if (t.identifier === lookId) {
-      state.lookYaw -= (t.clientX - lookLast.x) * 0.005;
-      state.lookPitch = THREE.MathUtils.clamp(state.lookPitch - (t.clientY - lookLast.y) * 0.004, -0.5, 0.9);
+      cam.yaw -= (t.clientX - lookLast.x) * 0.005;
+      cam.pitch = THREE.MathUtils.clamp(cam.pitch - (t.clientY - lookLast.y) * 0.004, -0.5, 0.9);
       lookLast = { x: t.clientX, y: t.clientY };
     }
   }
@@ -441,52 +535,43 @@ addEventListener('touchend', (e) => {
   }
 });
 let mouseLook = false, mouseLast = { x: 0, y: 0 };
-addEventListener('mousedown', (e) => { idleT = 0; userTouched = true; if (demo.on) stopDemo(true); if (e.target === renderer.domElement) { mouseLook = true; mouseLast = { x: e.clientX, y: e.clientY }; } });
+addEventListener('mousedown', (e) => { idleT = 0; userTouched = true; markInteracted(); const onUi = e.target.closest && e.target.closest('.hud, #timeCtl'); if (demo.on && !onUi) stopDemo(true); if (e.target === renderer.domElement) { mouseLook = true; mouseLast = { x: e.clientX, y: e.clientY }; } });
 addEventListener('mousemove', (e) => {
   if (!mouseLook) return;
-  state.lookYaw -= (e.clientX - mouseLast.x) * 0.005;
-  state.lookPitch = THREE.MathUtils.clamp(state.lookPitch - (e.clientY - mouseLast.y) * 0.004, -0.5, 0.9);
+  cam.yaw -= (e.clientX - mouseLast.x) * 0.005;
+  cam.pitch = THREE.MathUtils.clamp(cam.pitch - (e.clientY - mouseLast.y) * 0.004, -0.5, 0.9);
   mouseLast = { x: e.clientX, y: e.clientY };
 });
 addEventListener('mouseup', () => mouseLook = false);
-addEventListener('wheel', (e) => { state.camDist = THREE.MathUtils.clamp(state.camDist + e.deltaY * 0.05, 4, 150); }, { passive: true });
+addEventListener('wheel', (e) => { cam.dist = THREE.MathUtils.clamp(cam.dist + e.deltaY * 0.05, 4, 150); }, { passive: true });
 for (const [id, v] of [['btnUp', 1], ['btnDown', -1]]) {
   const el = document.getElementById(id);
-  el.addEventListener('touchstart', (e) => { touchVert = v; e.preventDefault(); }, { passive: false });
-  el.addEventListener('touchend', () => touchVert = 0);
-  el.addEventListener('mousedown', () => touchVert = v);
-  el.addEventListener('mouseup', () => touchVert = 0);
+  el.addEventListener('touchstart', (e) => { input.touchVert = v; e.preventDefault(); }, { passive: false });
+  el.addEventListener('touchend', () => input.touchVert = 0);
+  el.addEventListener('mousedown', () => input.touchVert = v);
+  el.addEventListener('mouseup', () => input.touchVert = 0);
 }
 
 // ---------- vehicle switching + controls ----------
 const btnBoat = document.getElementById('btnBoat'), btnDrone = document.getElementById('btnDrone');
-function switchVehicle(v, fromDemo) {
-  if (v === state.vehicle) return;
-  if (demo.on && !fromDemo) { stopDemo(true); return; }
-  const d = state.drone, b = state.boat;
-  if (v === 'drone') {
-    if (d.aboard && d.battery <= 0.02) { flashNote('Drone battery flat — she charges while you run the boat.'); return; }
-    state.vehicle = 'drone';
-    if (d.aboard) {   // launch from the boat; if she's out hovering, you take her back over in place
-      d.aboard = false; d.dead = false; d.diveMin = d.battery;
-      d.pos.set(b.pos.x, Math.max(groundAt(b.pos.x, b.pos.z) + 1.5, state.tide - 6), b.pos.z);   // in the shallows, launch over the bottom — never inside it
-      d.theta = b.theta; d.vel.set(0, 0, 0);
-    }
-  } else {
-    state.vehicle = 'boat';
-    if (!d.aboard && hDist(b.pos, d.pos) < 15) {   // came alongside: recovered aboard
-      d.aboard = true;
-      if (d.diveMin < 1 / 3) reserveSpent = true;
-      flashNote(d.dead ? 'Drone recovered off the bottom. Charging.' : 'Drone recovered aboard. Charging.');
-    }
-    // otherwise she holds her hover where you left her — sail back for her
-  }
+function syncVehicleUI() {
   btnBoat.classList.toggle('active', state.vehicle === 'boat');
   btnDrone.classList.toggle('active', state.vehicle === 'drone');
   vertBtns.style.display = state.vehicle === 'drone' ? 'flex' : 'none';
 }
-btnBoat.addEventListener('click', () => switchVehicle('boat'));
-btnDrone.addEventListener('click', () => switchVehicle('drone'));
+// switchVehicle(v, source): the switch RULES live in the core; the
+// page owns takeover. Only source 'player' can take the conn from
+// the demo — a runtime switch (the demo's own, later the coach's)
+// never triggers a takeover.
+function uiSwitchVehicle(v, source) {
+  if (source === 'player' && demo.on) { stopDemo(true); return; }
+  game.switchVehicle(v, source);
+  drainEvents();
+  syncVehicleUI();
+  cancelSpeech();   // a fresh action silences the guide mid-line
+}
+btnBoat.addEventListener('click', () => uiSwitchVehicle('boat', 'player'));
+btnDrone.addEventListener('click', () => uiSwitchVehicle('drone', 'player'));
 document.getElementById('btnDemo').addEventListener('click', () => startDemo());
 document.getElementById('tide').addEventListener('input', (e) => {
   state.tide = parseFloat(e.target.value);
@@ -497,98 +582,25 @@ document.getElementById('tide').addEventListener('input', (e) => {
 
 // ---------- physics ----------
 const clock = new THREE.Clock();
-function stepBoat(dt, t) {
-  const b = state.boat;
-  const shaped = Math.sign(input.throttle) * Math.pow(Math.abs(input.throttle), 1.4);
-  const target = shaped * (shaped > 0 ? 6 : 2);
-  const rate = input.brake ? 3.2 : 1.1;
-  b.speed += THREE.MathUtils.clamp(target - b.speed, -rate * dt, rate * dt);
-  if (b.aground && b.speed > 0) b.speed = 0;
-  b.theta += input.turn * (0.12 + 0.38 * Math.min(Math.abs(b.speed) / 3, 1)) * Math.sign(b.speed || 1) * dt;
-  const f = fwdOf(b.theta);
-  b.pos.addScaledVector(f, b.speed * dt);
-  b.pos.x = THREE.MathUtils.clamp(b.pos.x, extent.minX + 5, extent.maxX - 5);
-  b.pos.z = THREE.MathUtils.clamp(b.pos.z, -(extent.maxY - 5), -(extent.minY + 5));
-  const bow = b.pos.clone().addScaledVector(f, 3.4);
-  b.aground = groundAt(bow.x, bow.z) > state.tide - 0.45 && Math.abs(b.speed) > 0.01;
-  // a hard strike is a fact the hull remembers: two and she takes water
-  if (b.aground && !b.wasAground && Math.abs(b.speed) > 2.2 && !missionOver) {
-    hullHits++;
-    if (hullHits >= 2) { takingWater = true; flashNote('Struck again — she is TAKING WATER. Make the anchorage, slow and straight.'); }
-    else flashNote('Struck the bottom hard — one strike. She is tender now; the next one opens her up.');
-  }
-  b.wasAground = b.aground;
-  if (takingWater) b.speed = THREE.MathUtils.clamp(b.speed, -1, 1.2);
-  b.pos.y = state.tide + Math.sin(t * 0.9) * 0.05;
-  boatMesh.position.copy(b.pos);
+// Rendering sync: the core stepped the physics; the page only
+// places the meshes. (The old page stepBoat/stepDrone live in
+// core.js now — one physics, two hosts.)
+function syncRender(t, frameDt) {
+  const b = state.boat, d = state.drone;
+  boatMesh.position.set(b.pos.x, b.pos.y, b.pos.z);
   boatMesh.rotation.set(Math.sin(t * 0.7) * 0.008, b.theta, Math.sin(t * 0.55) * 0.01);
   boatMesh.visible = true;
-  // the drone: aboard — on deck, charging; out — holding where you left her
-  const d = state.drone;
-  if (d.aboard) {
-    d.battery = Math.min(1, d.battery + dt * 0.05);
+  if (d.aboard) {   // on deck, where stepBoat's render always kept her
     droneMesh.position.set(b.pos.x + Math.sin(b.theta) * 1.9, b.pos.y + 1.25, b.pos.z + Math.cos(b.theta) * 1.9);
     droneMesh.rotation.set(0, b.theta, 0);
   } else {
-    droneMesh.position.copy(d.pos);
-    droneMesh.rotation.set(0, d.theta, 0);
-    if (d.dead && hDist(b.pos, d.pos) < 15) {
-      d.aboard = true; d.dead = false; d.battery = 0.03;
-      if (d.diveMin < 1 / 3) reserveSpent = true;
-      flashNote('Drone recovered off the bottom. Charging.');
-    }
+    droneMesh.position.set(d.pos.x, d.pos.y, d.pos.z);
+    droneMesh.rotation.set(THREE.MathUtils.clamp(-d.vel.y * 0.1, -0.3, 0.3), d.theta, 0);
   }
   droneMesh.visible = true;
-  ring.visible = false;
-}
-function stepDrone(dt, t) {
-  const d = state.drone;
-  const f = fwdOf(d.theta);
-  const maxF = input.boost ? 4.5 : 2.6;
-  d.theta += input.turn * 0.9 * dt;
-  const shapedD = Math.sign(input.throttle) * Math.pow(Math.abs(input.throttle), 1.4);
-  const thrust = new THREE.Vector3()
-    .addScaledVector(f, shapedD * 1.7 * (input.boost ? 1.75 : 1))
-    .add(new THREE.Vector3(0, (input.vert + touchVert) * 1.5, 0));
-  // battery: hover sips, work drinks — thirds are the discipline
-  const effort = Math.min(1, Math.abs(shapedD) + Math.abs(input.vert + touchVert) + (input.boost ? 0.5 : 0));
-  d.battery = Math.max(0, d.battery - dt * (1 / 600 + effort / 240));
-  d.diveMin = Math.min(d.diveMin, d.battery);
-  if (d.battery <= 0) {
-    thrust.set(0, 0, 0);
-    d.vel.y -= 0.35 * dt;   // no lift: she settles
-    if (!d.dead && d.pos.y <= groundAt(d.pos.x, d.pos.z) + 0.85) {
-      d.dead = true; flashNote('Battery spent — drone on the bottom. Bring the boat to her.');
-    }
-  }
-  d.vel.addScaledVector(thrust, dt);
-  d.vel.multiplyScalar(Math.exp(-1.7 * dt));
-  if (input.brake) d.vel.multiplyScalar(Math.exp(-6 * dt));
-  if (d.vel.length() > maxF * 1.4) d.vel.setLength(maxF * 1.4);
-  d.pos.addScaledVector(d.vel, dt);
-  d.pos.x = THREE.MathUtils.clamp(d.pos.x, extent.minX + 3, extent.maxX - 3);
-  d.pos.z = THREE.MathUtils.clamp(d.pos.z, -(extent.maxY - 3), -(extent.minY + 3));
-  const floor = groundAt(d.pos.x, d.pos.z) + 0.8;
-  if (d.pos.y < floor) { d.pos.y = floor; d.vel.y = Math.max(d.vel.y, 0); }
-  const ceil = state.tide - 0.4;
-  if (d.pos.y > ceil) { d.pos.y = ceil; d.vel.y = Math.min(d.vel.y, 0); }
-  droneMesh.position.copy(d.pos);
-  droneMesh.rotation.set(THREE.MathUtils.clamp(-d.vel.y * 0.1, -0.3, 0.3), d.theta, 0);
-  droneMesh.visible = true;
-  ring.position.set(state.boat.pos.x, state.tide + 0.06, state.boat.pos.z);
-  ring.visible = true;
-  // the boat lies where you left her, on the surface
-  boatMesh.position.set(state.boat.pos.x, state.tide + Math.sin(t * 0.9) * 0.05, state.boat.pos.z);
-  boatMesh.rotation.set(Math.sin(t * 0.7) * 0.008, state.boat.theta, Math.sin(t * 0.55) * 0.01);
-  boatMesh.visible = true;
-  // working the shoal: inside the bay, under the surface, close over the bottom
-  const gnd = groundAt(d.pos.x, d.pos.z);
-  if (hDist(d.pos, BAYC) < 350 && (d.pos.y - gnd) < 2.5 && (state.tide - d.pos.y) > 1.5) shoalTime += dt;
-  // finding the pot: close, low over it, held for a slow count of three
-  if (!potFound && hDist(d.pos, POT) < 10 && (d.pos.y - gnd) < 3) {
-    potTime += dt;
-    if (potTime > 3) { potFound = true; flashNote('CONTACT — that is her pot. Position logged for the Marigold.'); }
-  } else if (!potFound) potTime = 0;
+  ring.visible = state.vehicle === 'drone';
+  if (ring.visible) ring.position.set(b.pos.x, state.tide + 0.06, b.pos.z);
+  applyPoles(frameDt);
 }
 
 // the 15 m recovery ring: the drone's way home, drawn on the water
@@ -600,7 +612,7 @@ ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring);
 const traffic = [];
 {
   const mk = (color, speed, route) => {
-    const g = buildBoat();
+    const g = buildBoat(false);
     const m = new THREE.MeshStandardMaterial({ color, roughness: 0.6 });
     g.children[0].material = m; g.children[1].material = m;
     scene.add(g);
@@ -658,9 +670,9 @@ function demoSet(step) { demo.step = step; demo.phase = 'go'; demo.wait = 0; dem
 function startDemo() {
   if (demo.on) return;
   demo.on = true; demoSet(0);
-  if (state.vehicle !== 'boat') switchVehicle('boat', true);   // the show starts on the surface
+  if (state.vehicle !== 'boat') uiSwitchVehicle('boat', 'runtime');   // the show starts on the surface
   saveEnabled = false;   // the show is not the player's run — never persisted
-  state.camDist = Math.max(state.camDist, 16);
+  cam.dist = Math.max(cam.dist, 16);
   demoPillEl.style.display = 'block';
 }
 function stopDemo(tookControl) {
@@ -690,25 +702,25 @@ function demoControl(dt) {
     case 3: {   // work the shoal
       demoSay('Working the shoal — the drone goes down to look');
       const ty = groundAt(8380, 430) + 1.2;
-      if (demo.phase === 'go') { switchVehicle('drone', true); if (demoDroneTo(8380, ty, 430)) demo.phase = 'hold'; }
+      if (demo.phase === 'go') { uiSwitchVehicle('drone', 'runtime'); if (demoDroneTo(8380, ty, 430)) demo.phase = 'hold'; }
       else if (demo.phase === 'hold') {
         input.throttle = 0.12; input.turn = 0.1; input.boost = false;
         input.vert = THREE.MathUtils.clamp((ty - d.pos.y) * 0.9, -1, 1);
         demo.wait += dt; if (demo.wait > 7) demo.phase = 'back';
-      } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { switchVehicle('boat', true); demoSet(4); }
+      } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { uiSwitchVehicle('boat', 'runtime'); demoSet(4); }
       break; }
     case 4: {   // the pot: hunt the pinger down the drainage
       demoSay('The lost pot — hunting the pinger');
       const py = groundAt(POT.x, POT.z) + 1.2;
-      if (demo.phase === 'go') { switchVehicle('drone', true); if (demoDroneTo(POT.x, py, POT.z)) demo.phase = 'hold'; }
+      if (demo.phase === 'go') { uiSwitchVehicle('drone', 'runtime'); if (demoDroneTo(POT.x, py, POT.z)) demo.phase = 'hold'; }
       else if (demo.phase === 'hold') {
         demoDroneTo(POT.x, py, POT.z);
         demo.wait += dt; if (demo.wait > 4.5) demo.phase = 'back';
-      } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { switchVehicle('boat', true); demoSet(5); }
+      } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { uiSwitchVehicle('boat', 'runtime'); demoSet(5); }
       break; }
     case 5: {   // creep into the cove; the keel is the instrument
       demoSay('Feeling her way into the cove — watch the keel');
-      const bow = b.pos.clone().addScaledVector(fwdOf(b.theta), 3.4);
+      const bf = fwdOf(b.theta); const bow = { x: b.pos.x + bf.x * 3.4, z: b.pos.z + bf.z * 3.4 };
       const keelBow = state.tide - groundAt(bow.x, bow.z);
       const arrived = demoBoatTo(8957, 596, 1.3);
       if (Math.abs(b.speed) < 0.05 && input.throttle > 0) demo.stuck += dt; else demo.stuck = 0;
@@ -718,7 +730,7 @@ function demoControl(dt) {
       demoSay('The wreck — a small ship in the shallows');
       const wy = groundAt(WRECK.x, WRECK.z) + 1.4;
       const orbitPts = [[WRECK.x - 15, WRECK.z], [WRECK.x, WRECK.z + 15], [WRECK.x + 15, WRECK.z], [WRECK.x, WRECK.z - 15]];
-      if (demo.phase === 'go') { switchVehicle('drone', true); demo.phase = 'orbit'; }
+      if (demo.phase === 'go') { uiSwitchVehicle('drone', 'runtime'); demo.phase = 'orbit'; }
       else if (demo.phase === 'orbit') {
         const [ox, oz] = orbitPts[demo.orbit];
         if (demoDroneTo(ox, wy, oz)) { demo.orbit++; if (demo.orbit >= orbitPts.length) demo.phase = 'hold'; }
@@ -727,7 +739,7 @@ function demoControl(dt) {
         input.turn = THREE.MathUtils.clamp(wrapPi(Math.atan2(-(WRECK.x - d.pos.x), -(WRECK.z - d.pos.z)) - d.theta) * 1.8, -1, 1);
         input.vert = THREE.MathUtils.clamp((wy - d.pos.y) * 0.9, -1, 1);
         demo.wait += dt; if (demo.wait > 4) demo.phase = 'back';
-      } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { switchVehicle('boat', true); demoSet(7); }
+      } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { uiSwitchVehicle('boat', 'runtime'); demoSet(7); }
       break; }
     case 7: demoSay('Bringing her home');
       if (demoBoatTo(7600, 380, 5.4)) demoSet(8); break;
@@ -770,7 +782,7 @@ function drawMinichart(focus) {
     chartCtx.save(); chartCtx.translate(mx, my); draw(); chartCtx.restore();
   };
   mark(SPAWN.x, SPAWN.z, () => { chartCtx.fillStyle = '#cfd8dc'; chartCtx.beginPath(); chartCtx.arc(0, 0, 3, 0, 7); chartCtx.fill(); });
-  mark(POT.x, POT.z, () => { chartCtx.fillStyle = potFound ? '#7dd87d' : '#ff9f43'; chartCtx.beginPath(); chartCtx.arc(0, 0, 3.4, 0, 7); chartCtx.fill(); });
+  mark(POT.x, POT.z, () => { chartCtx.fillStyle = F.potFound ? '#7dd87d' : '#ff9f43'; chartCtx.beginPath(); chartCtx.arc(0, 0, 3.4, 0, 7); chartCtx.fill(); });
   mark(WRECK.x, WRECK.z, () => { chartCtx.strokeStyle = '#ff7a6b'; chartCtx.lineWidth = 1.8; chartCtx.beginPath(); chartCtx.moveTo(-3, -3); chartCtx.lineTo(3, 3); chartCtx.moveTo(3, -3); chartCtx.lineTo(-3, 3); chartCtx.stroke(); });
   if (!state.drone.aboard) mark(state.drone.pos.x, state.drone.pos.z, () => { chartCtx.fillStyle = '#4dd0e1'; chartCtx.beginPath(); chartCtx.arc(0, 0, 2.6, 0, 7); chartCtx.fill(); });
   mark(state.boat.pos.x, state.boat.pos.z, () => {
@@ -812,6 +824,147 @@ function loadFarView() {
   }).catch(() => {});
 }
 
+// ---------- additions: time, poles, the local guide ----------
+// Addition 1 — time acceleration. A clock setting, not a controller
+// setting: it scales the fixed-step accumulator's feed in animate(),
+// so it applies identically under the demo, a coach runtime, or a
+// human. The physics step never changes.
+let timeScale = 1;
+for (const btn of document.querySelectorAll('#timeCtl button')) {
+  btn.addEventListener('click', () => {
+    timeScale = parseInt(btn.dataset.ts, 10);
+    for (const b of document.querySelectorAll('#timeCtl button')) b.classList.toggle('active', b === btn);
+  });
+}
+// Addition 3 (controls) — the trolling poles toggle. The swing
+// itself is animated in applyPoles() off the boat mesh; purely visual.
+const btnPoles = document.getElementById('btnPoles');
+function togglePoles() {
+  poles.target = poles.target ? 0 : 1;
+  btnPoles.textContent = poles.target ? '🎣 Trolling poles: deployed' : '🎣 Trolling poles: stowed';
+  btnPoles.classList.toggle('active', !!poles.target);
+  flashNote(poles.target ? 'Poles down — gear over the quarters.' : 'Poles up — stowed alongside the mast.');
+  cancelSpeech();
+}
+btnPoles.addEventListener('click', togglePoles);
+// Addition 2 — the local narrator ("guide"): guidance lines computed
+// purely from game state, shown on the caption pill when the demo is
+// not using it, and optionally spoken with the browser's built-in
+// speechSynthesis. No network, no backend, no keys. Line selection is
+// deterministic from state (a seeded pick rotates 2-3 phrasings of the
+// same fact). Cloud-voiced personality lines are a later layer; this
+// is the local bank.
+const pillTagEl = document.getElementById('pillTag'), pillHintEl = document.getElementById('pillHint');
+let voiceOn = false, interacted = false, lastSpoken = '', pillMode = '';
+function markInteracted() { interacted = true; }
+function cancelSpeech() { try { if ('speechSynthesis' in window) speechSynthesis.cancel(); } catch (e) {} lastSpoken = ''; }
+function speak(text) {
+  if (!voiceOn || !interacted || !('speechSynthesis' in window)) return;   // browsers block speech before a user gesture
+  if (text === lastSpoken) return;
+  lastSpoken = text;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate = 1.05;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+const btnVoice = document.getElementById('btnVoice');
+btnVoice.addEventListener('click', () => {
+  voiceOn = !voiceOn;
+  btnVoice.textContent = voiceOn ? '🔊 Guide voice: on' : '🔇 Guide voice: off';
+  btnVoice.classList.toggle('active', voiceOn);
+  if (!voiceOn) cancelSpeech();
+});
+function setPillMode(mode) {
+  if (pillMode === mode) return;
+  pillMode = mode;
+  if (mode === 'demo') { pillTagEl.innerHTML = '▶ <b>DEMO</b>'; pillHintEl.style.display = ''; }
+  else { pillTagEl.innerHTML = '🧭 <b>GUIDE</b>'; pillHintEl.style.display = 'none'; }
+}
+const NARR_TARGETS = [null, BAYC, BAYC, POT, SPAWN, WRECK];
+const NARR_LABELS = ['cast off', 'Jamestown Bay', 'the shoal', 'the lost pot', 'home', 'the wreck'];
+const NARR_ARRIVALS = ['Cast off — underway.', 'Jamestown Bay — made it.', 'The shoal is worked. That is the drone discipline.',
+  "That's her pot — position logged for the Marigold.", 'Home, with the pot found.', 'The wreck is logged — that is everything.'];
+let narrLine = '', narrBattBand = 3, narrPingBand = null, narrPrevDone = null, narrEvent = '', narrEventUntil = -1;
+function relWords(from, theta, to) {
+  const brg = Math.atan2(to.x - from.x, -(to.z - from.z));
+  let rel = brg - (-theta);
+  while (rel > Math.PI) rel -= 2 * Math.PI;
+  while (rel < -Math.PI) rel += 2 * Math.PI;
+  const sectors = ['dead ahead', 'off your starboard bow', 'on your starboard beam', 'on your starboard quarter',
+    'dead astern', 'on your port quarter', 'on your port beam', 'off your port bow'];
+  return sectors[((Math.round(rel / (Math.PI / 4)) % 8) + 8) % 8];
+}
+const friendlyDist = (m) => m < 950 ? `${Math.max(10, Math.round(m / 10) * 10)} metres` : `${(m / 1000).toFixed(1)} kilometres`;
+const pickLine = (arr, seed) => arr[((seed % arr.length) + arr.length) % arr.length];
+function narrate(OBJS, ni) {
+  if (demo.on) { setPillMode('demo'); return; }
+  setPillMode('guide');
+  const bt = state.boat, d = state.drone;
+  if (!narrPrevDone) narrPrevDone = OBJS.map(o => o[1]);
+  // edge events: arrivals, battery thirds, pinger warmer/colder
+  OBJS.forEach(([, done], i) => {
+    if (done && !narrPrevDone[i]) { narrEvent = NARR_ARRIVALS[i]; narrEventUntil = state.time + 7; }
+    narrPrevDone[i] = done;
+  });
+  const band = d.battery > 2 / 3 ? 3 : d.battery > 1 / 3 ? 2 : 1;
+  if (!d.aboard && band < narrBattBand) {
+    narrEvent = band === 2 ? 'One third of the drone battery spent.' : 'Reserve third — bring the drone home to the boat.';
+    narrEventUntil = state.time + 7;
+  }
+  narrBattBand = d.aboard ? 3 : band;
+  if (!d.aboard && !F.potFound) {
+    const pd = hDist(d.pos, POT);
+    if (pd < 150) {
+      const pb = Math.floor(pd / 30);
+      if (narrPingBand !== null && pb !== narrPingBand) {
+        narrEvent = pb < narrPingBand ? 'Warmer — the pinger grows stronger.' : 'Colder — you are leaving the pinger behind.';
+        narrEventUntil = state.time + 5;
+      }
+      narrPingBand = pb;
+    } else narrPingBand = null;
+  } else narrPingBand = null;
+  // the standing warning outranks events; events outrank guidance
+  let line = '';
+  if (state.vehicle === 'boat') {
+    const bf = fwdOf(bt.theta);
+    const keel = state.tide - groundAt(bt.pos.x + bf.x * 3.4, bt.pos.z + bf.z * 3.4);
+    if (keel < 0.6) line = 'Shoaling fast — less than a metre under the bow. Ease her off.';
+    else if (keel < 1.2) line = 'Shoaling — mind the keel, the bottom is rising.';
+    else if (bt.aground) line = 'Aground — reverse off her, gentle.';
+  }
+  if (!line && state.time < narrEventUntil) line = narrEvent;
+  if (!line) {
+    if (ni === undefined) line = 'Scene complete — everything is logged.';
+    else if (ni === 0) line = 'Cast off — the bay lies east. W to get underway.';
+    else {
+      const tp = NARR_TARGETS[ni], label = NARR_LABELS[ni];
+      const veh = state.vehicle === 'boat' ? bt : d;
+      const dist = friendlyDist(hDist(veh.pos, tp));
+      if (ni === 3 && state.vehicle === 'drone') {
+        const pd = hDist(d.pos, POT);
+        line = pd >= 150 ? 'No pinger return yet — work east of the shoal and listen.' : `Pinger at ${Math.round(pd)} metres — take her down low over it and hold.`;
+      } else if (ni === 2 && state.vehicle === 'drone') {
+        line = 'Work the patch: stay low over the bottom, inside the bay, for a slow count of ten.';
+      } else {
+        const rel = relWords(veh.pos, veh.theta, tp);
+        line = pickLine([
+          `${label[0].toUpperCase() + label.slice(1)} is ${rel}, ${dist}.`,
+          `Steer for ${label} — ${rel}, ${dist} out.`,
+          `Make for ${label}: ${rel}, ${dist}.`,
+        ], ni * 7 + Math.floor(state.time / 25));
+      }
+    }
+  }
+  if (line !== narrLine) {
+    narrLine = line;
+    demoCapEl.textContent = line;
+    speak(line);
+  }
+  demoPillEl.style.display = line ? 'block' : 'none';
+}
+
 // ---------- camera + HUD + loop ----------
 const readout = document.getElementById('readoutBody');
 const readoutSummary = document.getElementById('readoutSummary');
@@ -827,36 +980,53 @@ const SURF_FOG = new THREE.Color(0x9db8c4), UW_FOG = new THREE.Color(0x0a4258);
 function latLon(x, z) {
   return { lon: ORIGIN.lon + x / MLON, lat: ORIGIN.lat + (-z) / 111320 };
 }
+let simAcc = 0;
 function animate() {
   requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const frameDt = Math.min(clock.getDelta(), 0.25);
   const t = clock.elapsedTime;
-  if (demo.on) demoControl(dt); else readKeys();
-  idleT += dt;
-  if (!demo.on && !demoSuppress && idleT > 90) startDemo();   // attract: a quiet screen starts telling the story
-  let vehPos, vehTheta;
-  stepTraffic(dt, t);
-  if (noteT > 0) noteT -= dt;
-  if (state.vehicle === 'boat') { stepBoat(dt, t); vehPos = state.boat.pos; vehTheta = state.boat.theta; }
-  else { stepDrone(dt, t); vehPos = state.drone.pos; vehTheta = state.drone.theta; }
+  // Fixed-step simulation: frame time feeds an accumulator — scaled
+  // by the time control (Addition 1: a clock setting, so it scales
+  // the feed, never the step; it applies identically under the demo,
+  // a coach runtime, or a human) — and the core steps in exact 1/60
+  // increments, rendering once per frame. Behaviour is identical at
+  // every speed; only the steps per frame change.
+  simAcc += frameDt * timeScale;
+  if (!demo.on) readKeys();
+  let guard = 0;
+  while (simAcc >= STEP && guard++ < 480) {
+    if (demo.on) demoControl(STEP);
+    idleT += STEP;
+    if (!demo.on && !demoSuppress && idleT > 90) startDemo();   // attract: a quiet screen starts telling the story
+    game.step(STEP);
+    drainEvents();
+    simAcc -= STEP;
+  }
+  if (guard >= 480) simAcc = 0;   // a long hitch sheds its backlog instead of spiralling
+  stepTraffic(frameDt, t);
+  if (noteT > 0) noteT -= frameDt;
+  syncRender(t, frameDt);
+  const vehPos = state.vehicle === 'boat' ? state.boat.pos : state.drone.pos;
+  const vehTheta = state.vehicle === 'boat' ? state.boat.theta : state.drone.theta;
 
   if (!mouseLook && lookId === null) {
-    state.lookYaw *= Math.exp(-0.25 * dt);
-    state.lookPitch *= Math.exp(-0.6 * dt);
+    cam.yaw *= Math.exp(-0.25 * frameDt);
+    cam.pitch *= Math.exp(-0.6 * frameDt);
   }
-  const f = fwdOf(vehTheta + state.lookYaw);
-  const dist = state.vehicle === 'boat' ? state.camDist : state.camDist * 0.6;
-  const h = (state.vehicle === 'boat' ? 4.2 : 2.4) + state.lookPitch * 6 + dist * 0.10;  // zoomed out = scouting view, rises with distance
-  const desired = vehPos.clone().addScaledVector(f, -dist).add(new THREE.Vector3(0, h, 0));
+  const f = fwdOf(vehTheta + cam.yaw);
+  const dist = state.vehicle === 'boat' ? cam.dist : cam.dist * 0.6;
+  const h = (state.vehicle === 'boat' ? 4.2 : 2.4) + cam.pitch * 6 + dist * 0.10;  // zoomed out = scouting view, rises with distance
+  const vehV = new THREE.Vector3(vehPos.x, vehPos.y, vehPos.z);
+  const desired = vehV.clone().addScaledVector(f, -dist).add(new THREE.Vector3(0, h, 0));
   const camFloor = groundAt(desired.x, desired.z) + 0.6;
   if (state.vehicle === 'drone') {
     desired.y = Math.max(desired.y, camFloor);
     if (state.drone.pos.y < state.tide - 0.5) desired.y = Math.max(Math.min(desired.y, state.tide - 0.35), camFloor);
   }
   else desired.y = Math.max(desired.y, state.tide + 0.5, camFloor);
-  camPos.lerp(desired, 1 - Math.exp(-3.5 * dt));
+  camPos.lerp(desired, 1 - Math.exp(-3.5 * frameDt));
   camera.position.copy(camPos);
-  camera.lookAt(vehPos.clone().addScaledVector(f, 8).add(new THREE.Vector3(0, 0.6, 0)));
+  camera.lookAt(vehV.clone().addScaledVector(f, 8).add(new THREE.Vector3(0, 0.6, 0)));
 
   const under = camera.position.y < state.tide;
   scene.background.copy(under ? UW_BG : SURF_BG);
@@ -864,7 +1034,7 @@ function animate() {
   scene.fog.density = under ? 0.03 : 0.0016;
   sun.intensity = under ? 0.55 : 1.6;
 
-  hudTimer += dt;
+  hudTimer += frameDt;
   if (hudTimer > 0.12) {
     hudTimer = 0;
     const p = latLon(vehPos.x, vehPos.z);
@@ -880,7 +1050,7 @@ function animate() {
       const keel = (state.tide - bot).toFixed(1);
       html = `🚤 <b>Boat</b> · ${kn} kn · hdg <b>${hdgDeg}° ${CPTS[Math.round(hdgDeg / 22.5) % 16]}</b><br>depth under keel <b>${keel} m</b>` +
         (bt.aground ? `<br><span class="warn">⚠ AGROUND — reverse off (S)</span>` : '') +
-        (takingWater ? `<br><span class="warn">⚠ TAKING WATER — make the anchorage</span>` : hullHits ? `<br>hull: one hard strike — she's tender` : '');
+        (F.takingWater ? `<br><span class="warn">⚠ TAKING WATER — make the anchorage</span>` : F.hullHits ? `<br>hull: one hard strike — she's tender` : '');
       if (d.aboard) html += `<br>🤿 drone aboard · batt <b>${battPct}%</b>` + (d.battery < 0.99 ? ' · charging' : '');
       else {
         const dx = d.pos.x - bt.pos.x, dn = -(d.pos.z - bt.pos.z);
@@ -889,7 +1059,7 @@ function animate() {
         html += `<br>🤿 drone out · <b>${Math.round(hDist(bt.pos, d.pos))} m ${pts[Math.round(brg / 45) % 8]}</b> · batt ${battPct}%` + (d.dead ? ' · <span class="warn">ON THE BOTTOM</span>' : '');
       }
     } else {
-      html = `🤿 <b>Drone</b> · ${d.vel.length().toFixed(1)} m/s<br>` +
+      html = `🤿 <b>Drone</b> · ${Math.hypot(d.vel.x, d.vel.y, d.vel.z).toFixed(1)} m/s<br>` +
         `depth <b>${(state.tide - d.pos.y).toFixed(1)} m</b> · clearance <b>${(d.pos.y - bot).toFixed(1)} m</b><br>` +
         `batt <span style="font-size:11px">${battBar}</span> <b>${battPct}%</b>` + pingerLine(d) +
         (d.battery < 1 / 3 ? `<br><span class="warn">⚠ RESERVE — head for the boat</span>` : d.battery < 2 / 3 ? `<br>one third spent` : '');
@@ -899,19 +1069,17 @@ function animate() {
     if (noteT > 0 && note) html += `<br><span style="color:var(--accent)">${note}</span>`;
     readout.innerHTML = html;
     readoutSummary.innerHTML = state.vehicle === 'boat'
-      ? `🚤 <b>Boat</b> · depth under keel <b>${(state.tide - bot).toFixed(1)} m</b>` + (bt.aground ? ' · <span class="warn">⚠ AGROUND</span>' : '') + (takingWater ? ' · <span class="warn">TAKING WATER</span>' : '')
-      : `🤿 <b>Drone</b> · depth <b>${(state.tide - d.pos.y).toFixed(1)} m</b>` + (d.dead ? ' · <span class="warn">BATTERY SPENT</span>' : d.battery < 1 / 3 ? ' · <span class="warn">⚠ RESERVE</span>' : '') + (potFound ? ' · pot ✓ logged' : hDist(d.pos, POT) < 150 ? ` · pot ${Math.round(hDist(d.pos, POT))} m` : '');
+      ? `🚤 <b>Boat</b> · depth under keel <b>${(state.tide - bot).toFixed(1)} m</b>` + (bt.aground ? ' · <span class="warn">⚠ AGROUND</span>' : '') + (F.takingWater ? ' · <span class="warn">TAKING WATER</span>' : '')
+      : `🤿 <b>Drone</b> · depth <b>${(state.tide - d.pos.y).toFixed(1)} m</b>` + (d.dead ? ' · <span class="warn">BATTERY SPENT</span>' : d.battery < 1 / 3 ? ' · <span class="warn">⚠ RESERVE</span>' : '') + (F.potFound ? ' · pot ✓ logged' : hDist(d.pos, POT) < 150 ? ` · pot ${Math.round(hDist(d.pos, POT))} m` : '');
     drawMinichart(vehPos);
     // Scene 1 — a job of work: the Marigold's lost pot
-    if (!wreckSeen && hDist(d.pos, WRECK) < 18 && Math.abs(d.pos.y - (groundAt(WRECK.x, WRECK.z) + 1)) < 8 && !d.aboard) wreckSeen = true;
-    if (takingWater && !missionOver && hDist(bt.pos, SPAWN) < 60) { missionOver = true; flashNote('Limped home. The yard will have her a week — reset and run it cleaner.'); }
     const OBJS = [
       ['Cast off — leave the Western Anchorage', hDist(bt.pos, SPAWN) > 60],
       ['Make Jamestown Bay — east, about 4 km', hDist(bt.pos, BAYC) < 350],
-      ['Work the shoal — learn the drone over the pale patch', shoalTime >= 10],
-      ["Find the Marigold's pot — follow the pinger, east of the shoal", potFound],
-      ['Bring her home — with the pot found', hDist(bt.pos, SPAWN) < 40 && potFound],
-      ['★ Bonus: log the wreck in the cove', wreckSeen],
+      ['Work the shoal — learn the drone over the pale patch', F.shoalTime >= 10],
+      ["Find the Marigold's pot — follow the pinger, east of the shoal", F.potFound],
+      ['Bring her home — with the pot found', hDist(bt.pos, SPAWN) < 40 && F.potFound],
+      ['★ Bonus: log the wreck in the cove', F.wreckSeen],
     ];
     sceneListEl.innerHTML = OBJS.map(([txt, done]) =>
       `<div class="obj ${done ? 'done' : ''}">${done ? '●' : '○'} ${txt}</div>`).join('');
@@ -931,13 +1099,14 @@ function animate() {
       }
     }
     sceneNextEl.textContent = sceneNavEl.textContent;
-    if (saveEnabled) try { localStorage.setItem('leadsman-run-v1', JSON.stringify({ b: [bt.pos.x, bt.pos.z, bt.theta], batt: d.battery, shoalTime, reserveSpent, sceneDone, tide: state.tide, potFound, wreckSeen, hullHits, takingWater })); } catch (e) {}
+    narrate(OBJS, ni);
+    if (saveEnabled) try { localStorage.setItem('leadsman-run-v1', JSON.stringify({ b: [bt.pos.x, bt.pos.z, bt.theta], batt: d.battery, shoalTime: F.shoalTime, reserveSpent: F.reserveSpent, sceneDone, tide: state.tide, potFound: F.potFound, wreckSeen: F.wreckSeen, hullHits: F.hullHits, takingWater: F.takingWater })); } catch (e) {}
     if (coreDone && !sceneDone) { sceneDone = true; flashNote('Scene 1 complete. Debrief below.'); }
-    const mm = Math.floor(t / 60), ss = String(Math.floor(t % 60)).padStart(2, '0');
-    sceneDebEl.textContent = missionOver
+    const mm = Math.floor(state.time / 60), ss = String(Math.floor(state.time % 60)).padStart(2, '0');
+    sceneDebEl.textContent = F.missionOver
       ? 'Debrief: she limped home taking water, the pot still out there. Reset and run it cleaner.'
       : sceneDone
-        ? `Debrief: pot logged · ${wreckSeen ? 'wreck filmed ★ · ' : ''}${mm}:${ss} on the clock · ` + (reserveSpent ? 'the reserve third got spent out there. The math re-figures.' : 'home with the third unspent. That is the discipline.')
+        ? `Debrief: pot logged · ${F.wreckSeen ? 'wreck filmed ★ · ' : ''}${mm}:${ss} on the clock · ` + (F.reserveSpent ? 'the reserve third got spent out there. The math re-figures.' : 'home with the third unspent. That is the discipline.')
         : "The Marigold's pot is on the drainage east of the shoal; its pinger is live. Two hard strikes and she takes water — mind the keel.";
   }
   renderer.render(scene, camera);
@@ -957,34 +1126,34 @@ document.getElementById('resetRun').addEventListener('click', (e) => {
   const wasReset = (() => { try { const f = sessionStorage.getItem('leadsman-reset'); if (f) sessionStorage.removeItem('leadsman-reset'); return !!f; } catch (e) { return false; } })();
   const startParam = new URLSearchParams(location.search).get('start');
   if (startParam === 'cove') {   // practice start: the wreck cove — shallow water, the spar ~115 m east
-    state.boat.pos.set(8900, state.tide, 612);
+    state.boat.pos.x = 8900; state.boat.pos.y = state.tide; state.boat.pos.z = 612;
     state.boat.theta = -1.5708;
-    state.drone.pos.set(8900, state.tide - 6, 612);
+    state.drone.pos.x = 8900; state.drone.pos.y = state.tide - 6; state.drone.pos.z = 612;
     demoSuppress = true;
     flashNote('Practice start: the wreck cove. Shallow water — and something breaks the surface to the east.');
   } else if (startParam === 'jamestown') {   // practice start: in the bay, by the shoal
-    state.boat.pos.set(8200, state.tide, 445);
+    state.boat.pos.x = 8200; state.boat.pos.y = state.tide; state.boat.pos.z = 445;
     state.boat.theta = -1.5708;
-    state.drone.pos.set(8200, state.tide - 6, 445);
+    state.drone.pos.x = 8200; state.drone.pos.y = state.tide - 6; state.drone.pos.z = 445;
     demoSuppress = true;
     flashNote('Practice start: Jamestown Bay. The wreck cove is east, at the back of the bay.');
   } else if (startParam === 'pot') {   // practice start: off the shoal, the pinger live to the east
-    state.boat.pos.set(8410, state.tide, 430);
+    state.boat.pos.x = 8410; state.boat.pos.y = state.tide; state.boat.pos.z = 430;
     state.boat.theta = -1.5708;
-    state.drone.pos.set(8410, state.tide - 6, 430);
+    state.drone.pos.x = 8410; state.drone.pos.y = state.tide - 6; state.drone.pos.z = 430;
     demoSuppress = true;
     flashNote("Practice start: off the shoal. The pot's pinger is live ~130 m east — V, and follow it down.");
   } else if (!wasReset) {
     try {
       const saved = JSON.parse(localStorage.getItem('leadsman-run-v1') || 'null');
       if (saved && saved.b) {
-        state.boat.pos.set(saved.b[0], state.tide, saved.b[1]);
+        state.boat.pos.x = saved.b[0]; state.boat.pos.y = state.tide; state.boat.pos.z = saved.b[1];
         state.boat.theta = saved.b[2];
-        state.drone.pos.set(saved.b[0], state.tide - 6, saved.b[1]);
-        state.drone.battery = saved.batt; shoalTime = saved.shoalTime || 0;
-        reserveSpent = !!saved.reserveSpent; sceneDone = !!saved.sceneDone;
-        potFound = !!saved.potFound; wreckSeen = !!saved.wreckSeen;
-        hullHits = saved.hullHits || 0; takingWater = !!saved.takingWater;
+        state.drone.pos.x = saved.b[0]; state.drone.pos.y = state.tide - 6; state.drone.pos.z = saved.b[1];
+        state.drone.battery = saved.batt; F.shoalTime = saved.shoalTime || 0;
+        F.reserveSpent = !!saved.reserveSpent; sceneDone = !!saved.sceneDone;
+        F.potFound = !!saved.potFound; F.wreckSeen = !!saved.wreckSeen;
+        F.hullHits = saved.hullHits || 0; F.takingWater = !!saved.takingWater;
         restoredRun = true;
         demoSuppress = true;   // a run in progress is never auto-played over
         if (typeof saved.tide === 'number') {

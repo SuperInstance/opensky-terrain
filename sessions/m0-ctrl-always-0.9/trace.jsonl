@@ -1,0 +1,12 @@
+{"t":0,"kind":"plan-start","legs":["make way to Jamestown Bay","work the shoal","bring her home"]}
+{"t":0,"kind":"tile-start","leg":"make way to Jamestown Bay","tile":"make-way","fit":0.9,"forced":false}
+{"t":778.98,"kind":"tile-done","leg":"make way to Jamestown Bay","tile":"make-way"}
+{"t":778.98,"kind":"tile-start","leg":"work the shoal","tile":"work-the-shoal","fit":0.9,"forced":false}
+{"t":837.7,"kind":"tile-done","leg":"work the shoal","tile":"work-the-shoal"}
+{"t":837.7166666662334,"kind":"offer","offer":"detour to the cove mouth (toward the wreck)","U":0,"P":1,"C":0,"H":0.9,"minutes":13.8,"score":0.9,"threshold":0,"bent":true}
+{"t":837.7,"kind":"tile-start","leg":"detour — cove mouth","tile":"make-way","fit":0.9,"forced":false}
+{"t":837.72,"kind":"game-note","text":"Drone recovered aboard. Charging."}
+{"t":1659.1,"kind":"tile-done","leg":"detour — cove mouth","tile":"make-way"}
+{"t":1659.1,"kind":"tile-start","leg":"bring her home","tile":"make-way","fit":0.9,"forced":false}
+{"t":2533.9,"kind":"tile-done","leg":"bring her home","tile":"make-way"}
+{"t":2533.9,"kind":"plan-complete","completed":3,"of":3}

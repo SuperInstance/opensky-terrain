@@ -1,0 +1,22 @@
+# Session m0-ctrl-always-0.5 — judge always-0.5, tide +1.4
+
+- [00:00] A-plan: make way to Jamestown Bay → work the shoal → bring her home.
+- [00:00] make way to Jamestown Bay: not sure enough (50%) — holding station and looking again.
+- [00:01] make way to Jamestown Bay: held twice — running the most-proven eligible tile; session is exploratory.
+- [00:01] make way to Jamestown Bay: running make for (8471, 445) — 50% because control judge: constant 0.5 (forced by hold_count).
+- [13:00] make way to Jamestown Bay: make for (8471, 445) — done.
+- [13:00] work the shoal: not sure enough (50%) — holding station and looking again.
+- [13:03] work the shoal: held twice — running the most-proven eligible tile; session is exploratory.
+- [13:03] work the shoal: running work the shoal — 50% because control judge: constant 0.5 (forced by hold_count).
+- [14:04] work the shoal: work the shoal — done.
+- [14:04] Offer: the cove mouth, on the way home — bend score 0.9 beats the home leg's 0 (harvest en route 0.9, arrival chance 1); bending through the good water.
+- [14:04] detour — cove mouth: not sure enough (50%) — holding station and looking again.
+- [14:04] Drone recovered aboard. Charging.
+- [14:06] detour — cove mouth: held twice — running the most-proven eligible tile; session is exploratory.
+- [14:06] detour — cove mouth: running make for (8957, 596) — 50% because control judge: constant 0.5 (forced by hold_count).
+- [27:51] detour — cove mouth: make for (8957, 596) — done.
+- [27:51] bring her home: not sure enough (50%) — holding station and looking again.
+- [27:53] bring her home: held twice — running the most-proven eligible tile; session is exploratory.
+- [27:53] bring her home: running make for (4641, -779) — 50% because control judge: constant 0.5 (forced by hold_count).
+- [42:28] bring her home: make for (4641, -779) — done.
+- [42:28] Plan complete: 3 of 3 original legs done.
