@@ -80,9 +80,9 @@
 <div class="hud title">
   <div class="kicker">SuperInstance · Shoalwater · Open Sitka Sound</div>
   <h1>Explore Sitka Sound</h1>
-  <div class="sub">Scene 1 · Jamestown Bay. Real bathymetry, slow scale. Pilot the boat on the surface;
-  take the drone underneath and look into the nooks. Depths as exported;
-  datum assumed MLLW. <a class="plain" href="./" target="_blank" rel="noopener">← chart view</a></div>
+  <div class="sub">Scene 1 · Jamestown Bay. The crabber Marigold lost a pot in last night's blow — it is on the
+  drainage east of the shoal and its pinger is live. Find it with the drone, mind the keel
+  (two hard strikes and she takes water), and bring her home. Depths as exported; datum assumed MLLW. <a class="plain" href="./" target="_blank" rel="noopener">← chart view</a></div>
 </div>
 
 <div class="hud panel" id="scene"><div class="panelHead" id="sceneHead"><h3>Scene 1 — Jamestown Bay</h3><button class="foldBtn" id="sceneFold" aria-expanded="true" aria-label="Hide or show scene objectives"><span class="chev">▾</span></button></div><div id="sceneNext"></div><div id="sceneBody"><div id="sceneList">…</div><div class="deb" id="sceneNav"></div><div class="deb" id="sceneDeb">The drone flies on a battery: a third out, a third back, a third in reserve.</div><div class="deb"><a class="plain" href="#" id="resetRun">reset run</a></div></div></div>
@@ -241,10 +241,19 @@ scene.add(water);
 const SPAWN = { x: 4641, z: -779 };        // Western Anchorage
 const BAYC  = { x: 8471, z: 445 };         // Jamestown Bay centre (57.0460, -135.2900)
 const WRECK = { x: 9015, z: 612 };         // the cove at the back of the bay (57.0445, -135.2810)
+const POT   = { x: 8540, z: 430 };         // the Marigold's lost pot — drainage edge east of the shoal, 5.4 m down
 let shoalTime = 0, reserveSpent = false, sceneDone = false;
+let potFound = false, potTime = 0, wreckSeen = false, hullHits = 0, takingWater = false, missionOver = false, restoredRun = false;
 const tideFollowers = [];   // instanced fleets that ride the tide
 let note = '', noteT = 0;
 function flashNote(s) { note = s; noteT = 4; }
+function pingerLine(d) {
+  if (potFound) return `<br>pot pinger: <b>LOGGED ✓</b>`;
+  const pd = hDist(d.pos, POT);
+  if (pd >= 150) return `<br>pot pinger: no return`;
+  const bars = Math.max(1, Math.round((1 - pd / 150) * 8));
+  return `<br>pot pinger ${'▮'.repeat(bars)}${'▯'.repeat(8 - bars)} · ${Math.round(pd)} m`;
+}
 const hDist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
 // ---------- harbor kit: real OSM footprints, placed boats, the wreck ----------
@@ -302,6 +311,18 @@ const hDist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
   wreck.position.set(WRECK.x, sampleBottom(WRECK.x, -WRECK.z) + 0.7, WRECK.z);
   wreck.rotation.set(0.06, 0.7, 0.38);
   scene.add(wreck);
+  // the Marigold's lost pot — a cage on the drainage edge, its pinger light live
+  const pot = new THREE.Group();
+  const potMat = new THREE.MeshStandardMaterial({ color: 0x2c3436, roughness: 0.9 });
+  pot.add(new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.9, 1.1), potMat));
+  const barT = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.08, 0.08), potMat); barT.position.y = 0.45; pot.add(barT);
+  const barB = barT.clone(); barB.position.y = -0.45; pot.add(barB);
+  const potLight = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8),
+    new THREE.MeshStandardMaterial({ color: 0xff5533, emissive: 0xff3300, emissiveIntensity: 1.6 }));
+  potLight.position.set(0, 0.55, 0); pot.add(potLight);
+  pot.position.set(POT.x, sampleBottom(POT.x, -POT.z) + 0.5, POT.z);
+  pot.rotation.y = 0.4;
+  scene.add(pot);
 }
 
 // ---------- vehicles ----------
@@ -492,6 +513,14 @@ function stepBoat(dt, t) {
   b.pos.z = THREE.MathUtils.clamp(b.pos.z, -(extent.maxY - 5), -(extent.minY + 5));
   const bow = b.pos.clone().addScaledVector(f, 3.4);
   b.aground = groundAt(bow.x, bow.z) > state.tide - 0.45 && Math.abs(b.speed) > 0.01;
+  // a hard strike is a fact the hull remembers: two and she takes water
+  if (b.aground && !b.wasAground && Math.abs(b.speed) > 2.2 && !missionOver) {
+    hullHits++;
+    if (hullHits >= 2) { takingWater = true; flashNote('Struck again — she is TAKING WATER. Make the anchorage, slow and straight.'); }
+    else flashNote('Struck the bottom hard — one strike. She is tender now; the next one opens her up.');
+  }
+  b.wasAground = b.aground;
+  if (takingWater) b.speed = THREE.MathUtils.clamp(b.speed, -1, 1.2);
   b.pos.y = state.tide + Math.sin(t * 0.9) * 0.05;
   boatMesh.position.copy(b.pos);
   boatMesh.rotation.set(Math.sin(t * 0.7) * 0.008, b.theta, Math.sin(t * 0.55) * 0.01);
@@ -557,6 +586,11 @@ function stepDrone(dt, t) {
   // working the shoal: inside the bay, under the surface, close over the bottom
   const gnd = groundAt(d.pos.x, d.pos.z);
   if (hDist(d.pos, BAYC) < 350 && (d.pos.y - gnd) < 2.5 && (state.tide - d.pos.y) > 1.5) shoalTime += dt;
+  // finding the pot: close, low over it, held for a slow count of three
+  if (!potFound && hDist(d.pos, POT) < 10 && (d.pos.y - gnd) < 3) {
+    potTime += dt;
+    if (potTime > 3) { potFound = true; flashNote('CONTACT — that is her pot. Position logged for the Marigold.'); }
+  } else if (!potFound) potTime = 0;
 }
 
 // the 15 m recovery ring: the drone's way home, drawn on the water
@@ -643,7 +677,7 @@ function demoControl(dt) {
   input.brake = false;
   const b = state.boat, d = state.drone;
   // unstick: if she grounded or hung up under way, back off the way the game teaches
-  if (state.vehicle === 'boat' && demo.step !== 4 && demo.step !== 8) {
+  if (state.vehicle === 'boat' && demo.step !== 5 && demo.step !== 9) {
     if (demo.unstick > 0) { demo.unstick -= dt; input.throttle = -0.5; input.turn = 0; return; }
     if (Math.abs(b.speed) < 0.05 && input.throttle > 0) { demo.stuck += dt; if (demo.stuck > 2) { demo.unstick = 1.2; demo.stuck = 0; } }
     else if (Math.abs(b.speed) >= 0.05) demo.stuck = 0;
@@ -665,15 +699,24 @@ function demoControl(dt) {
         demo.wait += dt; if (demo.wait > 7) demo.phase = 'back';
       } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { switchVehicle('boat', true); demoSet(4); }
       break; }
-    case 4: {   // creep into the cove; the keel is the instrument
+    case 4: {   // the pot: hunt the pinger down the drainage
+      demoSay('The lost pot — hunting the pinger');
+      const py = groundAt(POT.x, POT.z) + 1.2;
+      if (demo.phase === 'go') { switchVehicle('drone', true); if (demoDroneTo(POT.x, py, POT.z)) demo.phase = 'hold'; }
+      else if (demo.phase === 'hold') {
+        demoDroneTo(POT.x, py, POT.z);
+        demo.wait += dt; if (demo.wait > 4.5) demo.phase = 'back';
+      } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { switchVehicle('boat', true); demoSet(5); }
+      break; }
+    case 5: {   // creep into the cove; the keel is the instrument
       demoSay('Feeling her way into the cove — watch the keel');
       const bow = b.pos.clone().addScaledVector(fwdOf(b.theta), 3.4);
       const keelBow = state.tide - groundAt(bow.x, bow.z);
       const arrived = demoBoatTo(8957, 596, 1.3);
       if (Math.abs(b.speed) < 0.05 && input.throttle > 0) demo.stuck += dt; else demo.stuck = 0;
-      if (arrived || keelBow < 1.35 || demo.stuck > 2.5) { input.throttle = 0; demoSet(5); }
+      if (arrived || keelBow < 1.35 || demo.stuck > 2.5) { input.throttle = 0; demoSet(6); }
       break; }
-    case 5: {   // dive the wreck: an orbit, a look, and home inside the thirds
+    case 6: {   // dive the wreck: an orbit, a look, and home inside the thirds
       demoSay('The wreck — a small ship in the shallows');
       const wy = groundAt(WRECK.x, WRECK.z) + 1.4;
       const orbitPts = [[WRECK.x - 15, WRECK.z], [WRECK.x, WRECK.z + 15], [WRECK.x + 15, WRECK.z], [WRECK.x, WRECK.z - 15]];
@@ -686,13 +729,13 @@ function demoControl(dt) {
         input.turn = THREE.MathUtils.clamp(wrapPi(Math.atan2(-(WRECK.x - d.pos.x), -(WRECK.z - d.pos.z)) - d.theta) * 1.8, -1, 1);
         input.vert = THREE.MathUtils.clamp((wy - d.pos.y) * 0.9, -1, 1);
         demo.wait += dt; if (demo.wait > 4) demo.phase = 'back';
-      } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { switchVehicle('boat', true); demoSet(6); }
+      } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { switchVehicle('boat', true); demoSet(7); }
       break; }
-    case 6: demoSay('Bringing her home');
-      if (demoBoatTo(7600, 380, 5.4)) demoSet(7); break;
-    case 7:
-      if (demoBoatTo(SPAWN.x, SPAWN.z, 5.4)) demoSet(8); break;
-    case 8: demoSay('Shoalwater — this harbour is yours. Take control any time.');
+    case 7: demoSay('Bringing her home');
+      if (demoBoatTo(7600, 380, 5.4)) demoSet(8); break;
+    case 8:
+      if (demoBoatTo(SPAWN.x, SPAWN.z, 5.4)) demoSet(9); break;
+    case 9: demoSay('Shoalwater — this harbour is yours. Take control any time.');
       input.throttle = 0; input.turn = 0;
       demo.wait += dt; if (demo.wait > 12) demoSet(0); break;
   }
@@ -704,7 +747,7 @@ const readoutSummary = document.getElementById('readoutSummary');
 const sceneListEl = document.getElementById('sceneList');
 const sceneDebEl = document.getElementById('sceneDeb');
 const sceneNavEl = document.getElementById('sceneNav');
-let prevDone = [false, false, false, false, false];
+let prevDone = [false, false, false, false, false, false];
 let saveEnabled = true;
 const camPos = new THREE.Vector3(4665, 8, -779);
 let hudTimer = 0;
@@ -765,7 +808,8 @@ function animate() {
       const CPTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
       const keel = (state.tide - bot).toFixed(1);
       html = `🚤 <b>Boat</b> · ${kn} kn · hdg <b>${hdgDeg}° ${CPTS[Math.round(hdgDeg / 22.5) % 16]}</b><br>depth under keel <b>${keel} m</b>` +
-        (bt.aground ? `<br><span class="warn">⚠ AGROUND — reverse off (S)</span>` : '');
+        (bt.aground ? `<br><span class="warn">⚠ AGROUND — reverse off (S)</span>` : '') +
+        (takingWater ? `<br><span class="warn">⚠ TAKING WATER — make the anchorage</span>` : hullHits ? `<br>hull: one hard strike — she's tender` : '');
       if (d.aboard) html += `<br>🤿 drone aboard · batt <b>${battPct}%</b>` + (d.battery < 0.99 ? ' · charging' : '');
       else {
         const dx = d.pos.x - bt.pos.x, dn = -(d.pos.z - bt.pos.z);
@@ -776,7 +820,7 @@ function animate() {
     } else {
       html = `🤿 <b>Drone</b> · ${d.vel.length().toFixed(1)} m/s<br>` +
         `depth <b>${(state.tide - d.pos.y).toFixed(1)} m</b> · clearance <b>${(d.pos.y - bot).toFixed(1)} m</b><br>` +
-        `batt <span style="font-size:11px">${battBar}</span> <b>${battPct}%</b>` +
+        `batt <span style="font-size:11px">${battBar}</span> <b>${battPct}%</b>` + pingerLine(d) +
         (d.battery < 1 / 3 ? `<br><span class="warn">⚠ RESERVE — head for the boat</span>` : d.battery < 2 / 3 ? `<br>one third spent` : '');
       if (d.dead) html += `<br><span class="warn">BATTERY SPENT — V to the boat, bring her here</span>`;
     }
@@ -786,20 +830,24 @@ function animate() {
     readoutSummary.innerHTML = state.vehicle === 'boat'
       ? `🚤 <b>Boat</b> · depth under keel <b>${(state.tide - bot).toFixed(1)} m</b>` + (bt.aground ? ' · <span class="warn">⚠ AGROUND</span>' : '')
       : `🤿 <b>Drone</b> · depth <b>${(state.tide - d.pos.y).toFixed(1)} m</b>` + (d.dead ? ' · <span class="warn">BATTERY SPENT</span>' : d.battery < 1 / 3 ? ' · <span class="warn">⚠ RESERVE</span>' : '');
-    // Scene 1
+    // Scene 1 — a job of work: the Marigold's lost pot
+    if (!wreckSeen && hDist(d.pos, WRECK) < 18 && Math.abs(d.pos.y - (groundAt(WRECK.x, WRECK.z) + 1)) < 8 && !d.aboard) wreckSeen = true;
+    if (takingWater && !missionOver && hDist(bt.pos, SPAWN) < 60) { missionOver = true; flashNote('Limped home. The yard will have her a week — reset and run it cleaner.'); }
     const OBJS = [
       ['Cast off — leave the Western Anchorage', hDist(bt.pos, SPAWN) > 60],
       ['Make Jamestown Bay — east, about 4 km', hDist(bt.pos, BAYC) < 350],
-      ['Work the shoal — drone down, close over the pale patch', shoalTime >= 10],
-      ['Find the wreck — watch for its spar breaking the surface in the cove', hDist(d.pos, WRECK) < 18 && Math.abs(d.pos.y - (groundAt(WRECK.x, WRECK.z) + 1)) < 8 && !d.aboard],
-      ['Bring her home', hDist(bt.pos, SPAWN) < 40 && hDist(bt.pos, BAYC) >= 350 && shoalTime >= 10],
+      ['Work the shoal — learn the drone over the pale patch', shoalTime >= 10],
+      ["Find the Marigold's pot — follow the pinger, east of the shoal", potFound],
+      ['Bring her home — with the pot found', hDist(bt.pos, SPAWN) < 40 && potFound],
+      ['★ Bonus: log the wreck in the cove', wreckSeen],
     ];
     sceneListEl.innerHTML = OBJS.map(([txt, done]) =>
       `<div class="obj ${done ? 'done' : ''}">${done ? '●' : '○'} ${txt}</div>`).join('');
     OBJS.forEach(([txt, done], i) => { if (done && !prevDone[i]) flashNote('✓ ' + txt.split(' — ')[0]); prevDone[i] = done; });
-    const NAVT = [[null, 'cast off — the bay lies east'], [BAYC, 'Jamestown Bay'], [BAYC, 'the shoal — Jamestown Bay'], [WRECK, 'the wreck cove'], [SPAWN, 'home — Western Anchorage']];
-    const ni = OBJS.findIndex(o => !o[1]);
-    if (ni === -1) sceneNavEl.textContent = 'Scene complete.';
+    const NAVT = [[null, 'cast off — the bay lies east'], [BAYC, 'Jamestown Bay'], [BAYC, 'the shoal — Jamestown Bay'], [POT, 'the pot — follow the pinger'], [SPAWN, 'home — Western Anchorage'], [WRECK, 'the wreck cove']];
+    const ni = [0, 1, 2, 3, 4, 5].find(i => !OBJS[i][1]);
+    const coreDone = [0, 1, 2, 3, 4].every(i => OBJS[i][1]);
+    if (ni === undefined) sceneNavEl.textContent = 'Scene complete.';
     else {
       const [tp, label] = NAVT[ni];
       if (!tp) sceneNavEl.textContent = 'Next: ' + label + '.';
@@ -811,11 +859,14 @@ function animate() {
       }
     }
     sceneNextEl.textContent = sceneNavEl.textContent;
-    if (saveEnabled) try { localStorage.setItem('leadsman-run-v1', JSON.stringify({ b: [bt.pos.x, bt.pos.z, bt.theta], batt: d.battery, shoalTime, reserveSpent, sceneDone, tide: state.tide })); } catch (e) {}
-    if (OBJS.every(o => o[1]) && !sceneDone) { sceneDone = true; flashNote('Scene 1 complete. Debrief below.'); }
-    sceneDebEl.textContent = sceneDone
-      ? (reserveSpent ? 'Debrief: home — but the reserve third got spent out there. The math re-figures.' : 'Debrief: home with the third unspent. That is the discipline.')
-      : 'The drone flies on a battery: a third out, a third back, a third in reserve.';
+    if (saveEnabled) try { localStorage.setItem('leadsman-run-v1', JSON.stringify({ b: [bt.pos.x, bt.pos.z, bt.theta], batt: d.battery, shoalTime, reserveSpent, sceneDone, tide: state.tide, potFound, wreckSeen, hullHits, takingWater })); } catch (e) {}
+    if (coreDone && !sceneDone) { sceneDone = true; flashNote('Scene 1 complete. Debrief below.'); }
+    const mm = Math.floor(t / 60), ss = String(Math.floor(t % 60)).padStart(2, '0');
+    sceneDebEl.textContent = missionOver
+      ? 'Debrief: she limped home taking water, the pot still out there. Reset and run it cleaner.'
+      : sceneDone
+        ? `Debrief: pot logged · ${wreckSeen ? 'wreck filmed ★ · ' : ''}${mm}:${ss} on the clock · ` + (reserveSpent ? 'the reserve third got spent out there. The math re-figures.' : 'home with the third unspent. That is the discipline.')
+        : "The Marigold's pot is on the drainage east of the shoal; its pinger is live. Two hard strikes and she takes water — mind the keel.";
   }
   renderer.render(scene, camera);
 }
@@ -845,6 +896,12 @@ document.getElementById('resetRun').addEventListener('click', (e) => {
     state.drone.pos.set(8200, state.tide - 6, 445);
     demoSuppress = true;
     flashNote('Practice start: Jamestown Bay. The wreck cove is east, at the back of the bay.');
+  } else if (startParam === 'pot') {   // practice start: off the shoal, the pinger live to the east
+    state.boat.pos.set(8410, state.tide, 430);
+    state.boat.theta = -1.5708;
+    state.drone.pos.set(8410, state.tide - 6, 430);
+    demoSuppress = true;
+    flashNote("Practice start: off the shoal. The pot's pinger is live ~130 m east — V, and follow it down.");
   } else if (!wasReset) {
     try {
       const saved = JSON.parse(localStorage.getItem('leadsman-run-v1') || 'null');
@@ -854,6 +911,9 @@ document.getElementById('resetRun').addEventListener('click', (e) => {
         state.drone.pos.set(saved.b[0], state.tide - 6, saved.b[1]);
         state.drone.battery = saved.batt; shoalTime = saved.shoalTime || 0;
         reserveSpent = !!saved.reserveSpent; sceneDone = !!saved.sceneDone;
+        potFound = !!saved.potFound; wreckSeen = !!saved.wreckSeen;
+        hullHits = saved.hullHits || 0; takingWater = !!saved.takingWater;
+        restoredRun = true;
         demoSuppress = true;   // a run in progress is never auto-played over
         if (typeof saved.tide === 'number') {
           state.tide = saved.tide;
@@ -865,6 +925,7 @@ document.getElementById('resetRun').addEventListener('click', (e) => {
       }
     } catch (e) {}
   }
+  if (!startParam && !restoredRun && !wasReset) flashNote("Scene 1: the Marigold's pot is lost in the bay — its pinger is live. V takes the drone down.");
 }
 // ---------- collapsible overlays (player-first: the world gets the screen) ----------
 const scenePanel = document.getElementById('scene');
