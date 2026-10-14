@@ -145,7 +145,12 @@ const MLON = 111320 * Math.cos(THREE.MathUtils.degToRad(ORIGIN.lat));
 // ---------- pack loading + height sampler ----------
 const fetchRetry = async (url, asBuf) => {
   for (let a = 0; a < 3; a++) {
-    try { const r = await fetch(url); if (r.ok) return asBuf ? await r.arrayBuffer() : await r.json(); } catch (e) {}
+    // a hung connection never settles on its own — cap each attempt, or one
+    // stalled tile holds the loading screen forever (seen 2026-10-14: a
+    // tester browser sat on 'loading tiles' for ~25 minutes, wire fine)
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 20000);
+    try { const r = await fetch(url, { signal: ctl.signal }); if (r.ok) return asBuf ? await r.arrayBuffer() : await r.json(); } catch (e) {} finally { clearTimeout(timer); }
     await new Promise(res => setTimeout(res, 900));
   }
   throw new Error('failed: ' + url);
