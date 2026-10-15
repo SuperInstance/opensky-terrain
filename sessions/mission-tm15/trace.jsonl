@@ -1,0 +1,15 @@
+{"t":0,"kind":"plan-start","legs":["make way to Jamestown Bay","work the shoal","hunt the pot","look at the wreck","bring her home"]}
+{"t":0,"kind":"tile-start","leg":"make way to Jamestown Bay","tile":"make-way","fit":0.8195833947495917,"forced":false}
+{"t":2061.62,"kind":"tile-failed","leg":"make way to Jamestown Bay","tile":"make-way"}
+{"t":2061.62,"kind":"tile-start","leg":"work the shoal","tile":"work-the-shoal","fit":0.97,"forced":false}
+{"t":2661.63,"kind":"tile-failed","leg":"work the shoal","tile":"work-the-shoal"}
+{"t":2661.63,"kind":"tile-start","leg":"hunt the pot","tile":"hunt-the-pot","fit":0.8652942667320296,"forced":false}
+{"t":2661.67,"kind":"tile-failed","leg":"hunt the pot","tile":"hunt-the-pot"}
+{"t":2661.67,"kind":"tile-declined","leg":"look at the wreck","tile":"wreck-look","reason":"the cove mouth carries -0.9 m at this tide — the keel guard would stop her on the bar; the wreck stays unlogged rather than struck for"}
+{"t":2661.6833333396135,"kind":"shadow-author","reason":"tile declined: the cove mouth carries -0.9 m at this tide — the keel guard would stop her on the bar; the wreck stays unlogged rather than struck for","situationClass":"wreck-look","topReasons":["the cove mouth carries -0.9 m at this tide — the keel guard would stop her on the bar; the wreck stays unlogged rather than struck for"],"budget":{"pulsesUsed":0,"pulsesCap":3,"note":"shadow only — M0 makes no model call"},"holdCount":0}
+{"t":2661.6833333396135,"kind":"offer","offer":"detour to the cove mouth (toward the wreck)","U":0,"P":0.47,"C":0,"H":0.9,"minutes":70.9,"score":0.9,"threshold":0,"bent":true}
+{"t":2661.67,"kind":"tile-start","leg":"detour — cove mouth","tile":"make-way","fit":0.8399953796231243,"forced":false}
+{"t":5361.67,"kind":"tile-failed","leg":"detour — cove mouth","tile":"make-way"}
+{"t":5361.67,"kind":"tile-start","leg":"bring her home","tile":"make-way","fit":0.8695267049861907,"forced":false}
+{"t":5691.78,"kind":"tile-done","leg":"bring her home","tile":"make-way"}
+{"t":5691.78,"kind":"plan-complete","completed":1,"of":5}

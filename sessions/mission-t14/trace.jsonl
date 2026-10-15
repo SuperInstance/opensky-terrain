@@ -1,0 +1,24 @@
+{"t":0,"kind":"plan-start","legs":["make way to Jamestown Bay","work the shoal","hunt the pot","look at the wreck","bring her home"]}
+{"t":0,"kind":"tile-start","leg":"make way to Jamestown Bay","tile":"make-way","fit":0.8195833947495917,"forced":false}
+{"t":778.98,"kind":"tile-done","leg":"make way to Jamestown Bay","tile":"make-way"}
+{"t":778.98,"kind":"tile-start","leg":"work the shoal","tile":"work-the-shoal","fit":0.97,"forced":false}
+{"t":825.28,"kind":"tile-done","leg":"work the shoal","tile":"work-the-shoal"}
+{"t":825.28,"kind":"tile-start","leg":"hunt the pot","tile":"hunt-the-pot","fit":0.9367667300565464,"forced":false}
+{"t":825.3,"kind":"game-note","text":"Drone recovered aboard. Charging."}
+{"t":828.32,"kind":"game-note","text":"Drone recovered aboard. Charging."}
+{"t":849.68,"kind":"game-note","text":"Drone recovered aboard. Charging."}
+{"t":864.58,"kind":"game-note","text":"Drone recovered aboard. Charging."}
+{"t":879.43,"kind":"game-note","text":"Drone recovered aboard. Charging."}
+{"t":957.02,"kind":"potFound"}
+{"t":957.02,"kind":"game-note","text":"CONTACT — that is her pot. Position logged for the Marigold."}
+{"t":979.83,"kind":"tile-done","leg":"hunt the pot","tile":"hunt-the-pot"}
+{"t":979.83,"kind":"tile-start","leg":"look at the wreck","tile":"wreck-look","fit":0.7949452231558535,"forced":false}
+{"t":979.85,"kind":"game-note","text":"Drone recovered aboard. Charging."}
+{"t":1776.58,"kind":"tile-done","leg":"look at the wreck","tile":"wreck-look"}
+{"t":1776.599999998713,"kind":"offer","offer":"detour to the cove mouth (toward the wreck)","U":0,"P":1,"C":0,"H":0.9,"minutes":0.5,"score":0.9,"threshold":0,"bent":true}
+{"t":1776.58,"kind":"tile-start","leg":"detour — cove mouth","tile":"make-way","fit":0.8996159267286262,"forced":false}
+{"t":1776.6,"kind":"game-note","text":"Drone recovered aboard. Charging."}
+{"t":1797.45,"kind":"tile-done","leg":"detour — cove mouth","tile":"make-way"}
+{"t":1797.45,"kind":"tile-start","leg":"bring her home","tile":"make-way","fit":0.8091006158107795,"forced":false}
+{"t":2677.63,"kind":"tile-done","leg":"bring her home","tile":"make-way"}
+{"t":2677.63,"kind":"plan-complete","completed":5,"of":5}

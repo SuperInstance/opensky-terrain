@@ -32,6 +32,17 @@ const realJudge = {
       const fit = Math.min(0.97, Math.max(0.05, 0.45 + (pre.depth - 2.3) * 0.06 + battery * 0.25));
       return { fit, reasons: [`the tide clears the shoal by ${pre.depth.toFixed(1)} m`, `drone battery ${Math.round(battery * 100)}%`] };
     }
+    if (tile.id === 'hunt-the-pot') {
+      const pre = tile.precondition({ game, adapter });
+      const battery = game.state.drone.battery;
+      const fit = Math.min(0.95, Math.max(0.05, 0.5 + (pre.depth - 2.0) * 0.03 + battery * 0.2));
+      return { fit, reasons: [`the drainage carries ${pre.depth.toFixed(1)} m of water to hunt in`, `drone battery ${Math.round(battery * 100)}% (the tile tops it up first)`] };
+    }
+    if (tile.id === 'wreck-look') {
+      const pre = tile.precondition({ game, adapter });
+      const fit = Math.min(0.92, Math.max(0.05, 0.62 + (pre.depth - 1.35) * 0.25));
+      return { fit, reasons: [`the cove mouth carries ${pre.depth.toFixed(1)} m — past the keel guard's 1.35 m with room`] };
+    }
     return { fit: 0.5, reasons: ['no heuristic for this tile yet'] };
   },
 };

@@ -18,14 +18,14 @@
 // open, the opportunity is recorded with its reasons and NO model is
 // called. The escalation-rate evidence costs zero tokens.
 import { clamp, hDist } from '../core.js';
-import { createMakeWay, shapedSpeed } from './tiles.js';
+import { createMakeWay, shapedSpeed, COVE_MOUTH } from './tiles.js';
 
 export const RUN_FLOOR = 0.70, MISFIT = 0.30;
 
 // Authored harvest values (design §2.1 — a port tax: each host game
 // authors its own; these are Shoalwater's, in value-units).
-export const HARVEST = { SPAWN: 0.0, BAYC: 0.6, shoal: 2.4, WRECK: 0.0, cove: 0.0 };
-export const COVE_MOUTH = { x: 8957, z: 596 };
+export const HARVEST = { SPAWN: 0.0, BAYC: 0.6, shoal: 2.4, pot: 1.8, WRECK: 0.0, cove: 0.0 };
+export { COVE_MOUTH };
 
 export function createOverseer({ game, adapter, judge, emit }) {
   const ctx = { game, adapter };

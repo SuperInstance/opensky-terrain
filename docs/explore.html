@@ -136,6 +136,7 @@ import { decodeQuantizedMeshTile } from './qm.js';
 // same physics in the page and in Node. Anchors come from the core so
 // the page, the sim and the coach runtime can never drift apart.
 import { createPack, gridFromTile, createGame, SPAWN, BAYC, WRECK, POT, STEP } from './core.js';
+import { createDemo } from './demo.js';
 
 const FM = 1.8288;
 const PACK = new URLSearchParams(location.search).get('pack') === 'demo' ? 'demo-pack' : 'real-pack';
@@ -510,8 +511,9 @@ function buildBoat(withName = true) {
   g.userData.tipLines = tipLines;
   return g;
 }
-// pole swing state (page-side, visual only): 0 = stowed, 1 = deployed
-const poles = { a: 0, target: 0 };
+// pole swing state (page-side, visual only): 0 = stowed, 1 = deployed.
+// `last` is the swing's own wall-clock stamp — see applyPoles.
+const poles = { a: 0, target: 0, last: null };
 // a hinge's pole-tip position in boat-local space, read off its
 // live rotation matrix — exact whatever the Euler conventions are.
 function poleTipLocal(hinge) {
@@ -540,7 +542,17 @@ function updateTipLine(entry, a, tip) {
   }
   pos.needsUpdate = true;
 }
-function applyPoles(dt) {
+function applyPoles() {
+  // The swing runs on its OWN wall clock, not the render feed: the
+  // frame delta handed to the renderer is clamped to 0.25 s for the
+  // physics accumulator, so a swing keyed to it runs long whenever
+  // frames arrive slowly (the test rig measured ~8 s in a throttled
+  // browser). performance.now() deltas keep the swing at ~1.5 s end
+  // to end at any frame rate; after a hidden tab, one frame simply
+  // completes whatever swing was in progress.
+  const now = performance.now() / 1000;
+  const dt = poles.last == null ? 0 : Math.min(now - poles.last, 1.5);
+  poles.last = now;
   const rate = dt / 1.5;   // ~1.5 s swing
   poles.a += THREE.MathUtils.clamp(poles.target - poles.a, -rate, rate);
   const hinges = boatMesh.userData.poleHinges, lines = boatMesh.userData.tipLines;
@@ -732,7 +744,7 @@ function syncRender(t, frameDt) {
   droneMesh.visible = true;
   ring.visible = state.vehicle === 'drone';
   if (ring.visible) ring.position.set(b.pos.x, state.tide + 0.06, b.pos.z);
-  applyPoles(frameDt);
+  applyPoles();
 }
 
 // the 15 m recovery ring: the drone's way home, drawn on the water
@@ -775,30 +787,18 @@ function stepTraffic(dt, t) {
 // ---------- the demo: the game plays itself until someone takes the conn ----------
 // The autopilot drives the same input object a player does — same physics, same
 // grounding, same battery. Captions teach the geography. Any input takes control.
-const demo = { on: false, step: 0, phase: 'go', wait: 0, stuck: 0, unstick: 0, orbit: 0, cap: '' };
+// The demo itself (steering + choreography) lives in demo.js —
+// shared with tools/demo-test.mjs, so the headless test flies the
+// real show, not a copy. The page wires it to the caption pill and
+// the vehicle switch.
+const demoCtl = createDemo({ state, input, groundAt,
+  say: (t) => demoSay(t), switchVehicle: (v) => uiSwitchVehicle(v, 'runtime') });
+const demo = demoCtl.demo;
+const demoSet = demoCtl.set, demoControl = demoCtl.control;
 let idleT = 0, userTouched = false, demoSuppress = false;
 const demoPillEl = document.getElementById('demoPill'), demoCapEl = document.getElementById('demoCap');
 demoPillEl.addEventListener('pointerdown', () => stopDemo(true));
 function demoSay(t) { if (demo.cap !== t) { demo.cap = t; demoCapEl.textContent = t; } }
-function wrapPi(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
-function demoBoatTo(x, z, speed) {
-  const b = state.boat;
-  const dx = x - b.pos.x, dz = z - b.pos.z;
-  if (Math.hypot(dx, dz) < 16) { input.throttle = 0; input.turn = 0; return true; }
-  input.turn = THREE.MathUtils.clamp(wrapPi(Math.atan2(-dx, -dz) - b.theta) * 1.6, -1, 1);
-  input.throttle = THREE.MathUtils.clamp(speed / 6, 0.16, 0.95);
-  return false;
-}
-function demoDroneTo(x, y, z) {
-  const d = state.drone;
-  const dx = x - d.pos.x, dz = z - d.pos.z, distH = Math.hypot(dx, dz);
-  input.turn = THREE.MathUtils.clamp(wrapPi(Math.atan2(-dx, -dz) - d.theta) * 1.8, -1, 1);
-  input.throttle = distH > 5 ? 0.85 : 0.2;
-  input.vert = THREE.MathUtils.clamp((y - d.pos.y) * 0.9, -1, 1);
-  input.boost = distH > 50;
-  return distH < 5 && Math.abs(y - d.pos.y) < 0.9;
-}
-function demoSet(step) { demo.step = step; demo.phase = 'go'; demo.wait = 0; demo.stuck = 0; demo.orbit = 0; }
 function startDemo() {
   if (demo.on) return;
   demo.on = true; demoSet(0);
@@ -815,74 +815,6 @@ function stopDemo(tookControl) {
   saveEnabled = true; idleT = 0;
   if (tookControl) flashNote('Your boat. W throttle · A/D steer · V takes the drone down.');
 }
-function demoControl(dt) {
-  input.brake = false;
-  const b = state.boat, d = state.drone;
-  // unstick: if she grounded or hung up under way, back off the way the game teaches
-  if (state.vehicle === 'boat' && demo.step !== 5 && demo.step !== 9) {
-    if (demo.unstick > 0) { demo.unstick -= dt; input.throttle = -0.5; input.turn = 0; return; }
-    if (Math.abs(b.speed) < 0.05 && input.throttle > 0) { demo.stuck += dt; if (demo.stuck > 2) { demo.unstick = 1.2; demo.stuck = 0; } }
-    else if (Math.abs(b.speed) >= 0.05) demo.stuck = 0;
-  }
-  switch (demo.step) {
-    case 0: demoSay('Casting off — the Western Anchorage');
-      if (demoBoatTo(5600, 150, 5.4)) demoSet(1); break;
-    case 1: demoSay('Making Jamestown Bay — four kilometres east');
-      if (demoBoatTo(7600, 380, 5.4)) demoSet(2); break;
-    case 2: demoSay('Into the bay — the pale patch is the shoal');
-      if (demoBoatTo(8300, 445, 3.2)) demoSet(3); break;
-    case 3: {   // work the shoal
-      demoSay('Working the shoal — the drone goes down to look');
-      const ty = groundAt(8380, 430) + 1.2;
-      if (demo.phase === 'go') { uiSwitchVehicle('drone', 'runtime'); if (demoDroneTo(8380, ty, 430)) demo.phase = 'hold'; }
-      else if (demo.phase === 'hold') {
-        input.throttle = 0.12; input.turn = 0.1; input.boost = false;
-        input.vert = THREE.MathUtils.clamp((ty - d.pos.y) * 0.9, -1, 1);
-        demo.wait += dt; if (demo.wait > 7) demo.phase = 'back';
-      } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { uiSwitchVehicle('boat', 'runtime'); demoSet(4); }
-      break; }
-    case 4: {   // the pot: hunt the pinger down the drainage
-      demoSay('The lost pot — hunting the pinger');
-      const py = groundAt(POT.x, POT.z) + 1.2;
-      if (demo.phase === 'go') { uiSwitchVehicle('drone', 'runtime'); if (demoDroneTo(POT.x, py, POT.z)) demo.phase = 'hold'; }
-      else if (demo.phase === 'hold') {
-        demoDroneTo(POT.x, py, POT.z);
-        demo.wait += dt; if (demo.wait > 4.5) demo.phase = 'back';
-      } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { uiSwitchVehicle('boat', 'runtime'); demoSet(5); }
-      break; }
-    case 5: {   // creep into the cove; the keel is the instrument
-      demoSay('Feeling her way into the cove — watch the keel');
-      const bf = fwdOf(b.theta); const bow = { x: b.pos.x + bf.x * 3.4, z: b.pos.z + bf.z * 3.4 };
-      const keelBow = state.tide - groundAt(bow.x, bow.z);
-      const arrived = demoBoatTo(8957, 596, 1.3);
-      if (Math.abs(b.speed) < 0.05 && input.throttle > 0) demo.stuck += dt; else demo.stuck = 0;
-      if (arrived || keelBow < 1.35 || demo.stuck > 2.5) { input.throttle = 0; demoSet(6); }
-      break; }
-    case 6: {   // dive the wreck: an orbit, a look, and home inside the thirds
-      demoSay('The wreck — a small ship in the shallows');
-      const wy = groundAt(WRECK.x, WRECK.z) + 1.4;
-      const orbitPts = [[WRECK.x - 15, WRECK.z], [WRECK.x, WRECK.z + 15], [WRECK.x + 15, WRECK.z], [WRECK.x, WRECK.z - 15]];
-      if (demo.phase === 'go') { uiSwitchVehicle('drone', 'runtime'); demo.phase = 'orbit'; }
-      else if (demo.phase === 'orbit') {
-        const [ox, oz] = orbitPts[demo.orbit];
-        if (demoDroneTo(ox, wy, oz)) { demo.orbit++; if (demo.orbit >= orbitPts.length) demo.phase = 'hold'; }
-      } else if (demo.phase === 'hold') {
-        input.throttle = 0; input.boost = false;
-        input.turn = THREE.MathUtils.clamp(wrapPi(Math.atan2(-(WRECK.x - d.pos.x), -(WRECK.z - d.pos.z)) - d.theta) * 1.8, -1, 1);
-        input.vert = THREE.MathUtils.clamp((wy - d.pos.y) * 0.9, -1, 1);
-        demo.wait += dt; if (demo.wait > 4) demo.phase = 'back';
-      } else if (demoDroneTo(b.pos.x, state.tide - 2, b.pos.z)) { uiSwitchVehicle('boat', 'runtime'); demoSet(7); }
-      break; }
-    case 7: demoSay('Bringing her home');
-      if (demoBoatTo(7600, 380, 5.4)) demoSet(8); break;
-    case 8:
-      if (demoBoatTo(SPAWN.x, SPAWN.z, 5.4)) demoSet(9); break;
-    case 9: demoSay('Shoalwater — this harbour is yours. Take control any time.');
-      input.throttle = 0; input.turn = 0;
-      demo.wait += dt; if (demo.wait > 12) demoSet(0); break;
-  }
-}
-
 // ---------- the little chart: where you are ----------
 // A moving chart in the corner, in the chart page's own depth language —
 // pre-rendered from the served tiles over the operating corridor, then the

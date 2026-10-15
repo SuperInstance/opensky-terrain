@@ -10,7 +10,7 @@
 // the adapter returns NaN for unmapped water, so a tile precondition
 // reading NaN is false, a corridor through NaN has probability 0, and
 // no safety signal can inherit the "assume deep" lie (HOST-DEFECT-01).
-import { SPAWN } from '../core.js';
+import { SPAWN, POT, hDist } from '../core.js';
 
 export function createAdapter(game, pack) {
   const tileAt = (x, z) => pack.tileAt(x, -z);
@@ -28,6 +28,20 @@ export function createAdapter(game, pack) {
       return pack.sampleConfidence(x, -z);
     },
     isMapped(x, z) { return tileAt(x, z) >= 0; },
+
+    // The pot pinger — the drone's receiver, modelled exactly as the
+    // game's HUD computes it (explore.html's pingerLine): horizontal
+    // range from the DRONE to the pot, a return only inside 150 m,
+    // reported as integer metres plus a 1..8 bar strength. This is
+    // the observation contract for the hunt: tiles consume range and
+    // bars — the same numbers a human player reads off the HUD —
+    // never the pot's coordinates, which live only here, inside the
+    // instrument, the way they live inside the page's HUD code.
+    pinger() {
+      const pd = hDist(game.state.drone.pos, POT);
+      if (pd >= 150) return { hasReturn: false, rangeM: null, bars: 0 };
+      return { hasReturn: true, rangeM: Math.round(pd), bars: Math.max(1, Math.round((1 - pd / 150) * 8)) };
+    },
 
     // Setup assertion (design §5.6): before any tile executes, every
     // anchor the library references must resolve to a real bottom, and

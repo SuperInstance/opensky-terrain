@@ -1,0 +1,25 @@
+# Session mission-t14 — judge real, tide +1.4
+
+- [00:00] A-plan: make way to Jamestown Bay → work the shoal → hunt the pot → look at the wreck → bring her home.
+- [00:00] make way to Jamestown Bay: running make for (8471, 445) — 82% because open mapped water, 4.0 km.
+- [12:58] make way to Jamestown Bay: make for (8471, 445) — done.
+- [12:58] work the shoal: running work the shoal — 97% because the tide clears the shoal by 11.8 m.
+- [13:45] work the shoal: work the shoal — done.
+- [13:45] hunt the pot: running hunt the pot — 94% because the drainage carries 10.4 m of water to hunt in.
+- [13:45] Drone recovered aboard. Charging.
+- [13:48] Drone recovered aboard. Charging.
+- [14:09] Drone recovered aboard. Charging.
+- [14:24] Drone recovered aboard. Charging.
+- [14:39] Drone recovered aboard. Charging.
+- [15:57] CONTACT — that is her pot. Position logged for the Marigold.
+- [16:19] hunt the pot: hunt the pot — done.
+- [16:19] look at the wreck: running look at the wreck — 79% because the cove mouth carries 2.0 m — past the keel guard's 1.35 m with room.
+- [16:19] Drone recovered aboard. Charging.
+- [29:36] look at the wreck: look at the wreck — done.
+- [29:36] Offer: the cove mouth, on the way home — bend score 0.9 beats the home leg's 0 (harvest en route 0.9, arrival chance 1); bending through the good water.
+- [29:36] detour — cove mouth: running make for (8957, 596) — 90% because open mapped water, 0.0 km.
+- [29:36] Drone recovered aboard. Charging.
+- [29:57] detour — cove mouth: make for (8957, 596) — done.
+- [29:57] bring her home: running make for (4641, -779) — 81% because open mapped water, 4.5 km.
+- [44:37] bring her home: make for (4641, -779) — done.
+- [44:37] Plan complete: 5 of 5 original legs done.

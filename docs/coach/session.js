@@ -4,10 +4,10 @@
 // runs and the harness; the page will drive the same overseer live.
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createGame, STEP, SPAWN, BAYC } from '../core.js';
+import { createGame, STEP, SPAWN, BAYC, WRECK } from '../core.js';
 import { createAdapter } from './adapter.js';
 import { createOverseer, HARVEST } from './overseer.js';
-import { createMakeWay, createWorkTheShoal, SHOAL_POINT } from './tiles.js';
+import { createMakeWay, createWorkTheShoal, createHuntThePot, createWreckLook, SHOAL_POINT, SEARCH_AREA } from './tiles.js';
 import { JUDGES } from './judges.js';
 
 export function buildDefaultPlan() {
@@ -16,6 +16,25 @@ export function buildDefaultPlan() {
       makeTile: () => createMakeWay({ x: BAYC.x, z: BAYC.z, speed: 5.4 }) },
     { label: 'work the shoal', intention: 'work-shoal', valueRate: HARVEST.shoal,
       makeTile: () => createWorkTheShoal() },
+    { label: 'bring her home', intention: 'reach-home', valueRate: HARVEST.SPAWN,
+      makeTile: () => createMakeWay({ x: SPAWN.x, z: SPAWN.z, speed: 5.4 }) },
+  ];
+}
+
+// The full mission: the whole Scene 1 job, end to end — bay, shoal,
+// the Marigold's pot, the wreck, and home. The bend/offer machinery
+// still fires where it fires (home follows the wreck, so the cove
+// mouth offer is scored from the cove itself — a short, honest bend).
+export function buildFullMissionPlan() {
+  return [
+    { label: 'make way to Jamestown Bay', intention: 'reach', valueRate: HARVEST.BAYC,
+      makeTile: () => createMakeWay({ x: BAYC.x, z: BAYC.z, speed: 5.4 }) },
+    { label: 'work the shoal', intention: 'work-shoal', valueRate: HARVEST.shoal,
+      makeTile: () => createWorkTheShoal() },
+    { label: 'hunt the pot', intention: 'hunt-pot', valueRate: HARVEST.pot,
+      makeTile: () => createHuntThePot() },
+    { label: 'look at the wreck', intention: 'wreck-look', valueRate: HARVEST.WRECK,
+      makeTile: () => createWreckLook() },
     { label: 'bring her home', intention: 'reach-home', valueRate: HARVEST.SPAWN,
       makeTile: () => createMakeWay({ x: SPAWN.x, z: SPAWN.z, speed: 5.4 }) },
   ];
@@ -33,7 +52,8 @@ export async function runSession({
   // the setup assertion gates everything: unmapped water, no session
   adapter.assertSetup([
     { name: 'SPAWN', ...SPAWN }, { name: 'BAYC', ...BAYC },
-    { name: 'shoal', ...SHOAL_POINT }, { name: 'cove mouth', x: 8957, z: 596 },
+    { name: 'shoal', ...SHOAL_POINT }, { name: 'pot drainage (charted search area)', ...SEARCH_AREA },
+    { name: 'cove mouth', x: 8957, z: 596 }, { name: 'wreck', ...WRECK },
   ]);
 
   const trace = [], story = [];
