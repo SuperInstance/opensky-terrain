@@ -13,7 +13,7 @@ in your first commit and clear it in your last.
 | Region packs and deployment | `docs/real-pack/`, `docs/full-pack/`, `docs/deployment.html`, GPU Job 1 | Main lane |
 | Coach Player | `docs/coach/`, `docs/core.js`, the boat build in `explore.html` | The Coach Player session |
 | The full-fidelity viewer (z0–z3 pack) | a separate repo — this repo stays lean | Main lane |
-| Ground truth — kayak survey (camera + GPS, layered passes) | a survey repo, captured on the water | The captain |
+| Ground truth — kayak survey (camera + GPS, layered passes) | `SuperInstance/shoalwater-survey` — phone field mode + viewer import (live 2026-10-14) | The captain |
 | The Classroom quilt | `SuperInstance/classroom` — its own PROTOCOL.md governs turns | All lanes, one patch per turn |
 
 ## House rules
