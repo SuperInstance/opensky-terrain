@@ -716,7 +716,8 @@ function uiSwitchVehicle(v, source) {
 }
 btnBoat.addEventListener('click', () => uiSwitchVehicle('boat', 'player'));
 btnDrone.addEventListener('click', () => uiSwitchVehicle('drone', 'player'));
-document.getElementById('btnDemo').addEventListener('click', () => startDemo());
+const btnDemoEl = document.getElementById('btnDemo');
+btnDemoEl.addEventListener('click', () => { if (demo.on) stopDemo(true); else startDemo(); });
 document.getElementById('tide').addEventListener('input', (e) => {
   state.tide = parseFloat(e.target.value);
   document.getElementById('tideVal').textContent = (state.tide >= 0 ? '+' : '') + state.tide.toFixed(1);
@@ -806,12 +807,14 @@ function startDemo() {
   saveEnabled = false;   // the show is not the player's run — never persisted
   cam.dist = Math.max(cam.dist, 16);
   demoPillEl.style.display = 'block';
+  btnDemoEl.textContent = '⏹ Stop the demo';
 }
 function stopDemo(tookControl) {
   if (!demo.on) return;
   demo.on = false;
   input.throttle = 0; input.turn = 0; input.vert = 0; input.boost = false; input.brake = false;
   demoPillEl.style.display = 'none';
+  btnDemoEl.textContent = '▶ Watch the demo';
   saveEnabled = true; idleT = 0;
   if (tookControl) flashNote('Your boat. W throttle · A/D steer · V takes the drone down.');
 }
@@ -1045,17 +1048,28 @@ function latLon(x, z) {
   return { lon: ORIGIN.lon + x / MLON, lat: ORIGIN.lat + (-z) / 111320 };
 }
 let simAcc = 0;
+let simLast = null;   // the sim feed's own wall clock (performance.now, seconds)
 function animate() {
   requestAnimationFrame(animate);
   const frameDt = Math.min(clock.getDelta(), 0.25);
   const t = clock.elapsedTime;
-  // Fixed-step simulation: frame time feeds an accumulator — scaled
-  // by the time control (Addition 1: a clock setting, so it scales
-  // the feed, never the step; it applies identically under the demo,
-  // a coach runtime, or a human) — and the core steps in exact 1/60
-  // increments, rendering once per frame. Behaviour is identical at
-  // every speed; only the steps per frame change.
-  simAcc += frameDt * timeScale;
+  // Fixed-step simulation: the accumulator is fed from the WALL
+  // CLOCK, not the render feed — the frame delta above is clamped
+  // to 0.25 s for rendering, so a feed keyed to it starves the sim
+  // whenever frames arrive slowly (on a throttled tab, 8× delivered
+  // only a fraction of real time; the pole swing had the same
+  // disease and was cured the same way — see applyPoles). The feed
+  // is scaled by the time control (Addition 1: a clock setting, so
+  // it scales the feed, never the step; it applies identically
+  // under the demo, a coach runtime, or a human), clamped to 1.0 s
+  // per frame so a long hitch sheds its backlog instead of trying
+  // to replay it, and the core steps in exact 1/60 increments,
+  // rendering once per frame. Behaviour is identical at every
+  // speed; only the steps per frame change.
+  const simNow = performance.now() / 1000;
+  const wallDt = simLast == null ? 0 : Math.min(simNow - simLast, 1.0);
+  simLast = simNow;
+  simAcc += wallDt * timeScale;
   if (!demo.on) readKeys();
   let guard = 0;
   while (simAcc >= STEP && guard++ < 480) {
@@ -1067,7 +1081,7 @@ function animate() {
     simAcc -= STEP;
   }
   if (guard >= 480) simAcc = 0;   // a long hitch sheds its backlog instead of spiralling
-  stepTraffic(frameDt, t);
+  stepTraffic(wallDt, t);   // ambient boats sail world time too — same wall-clock feed as the sim
   if (noteT > 0) noteT -= frameDt;
   syncRender(t, frameDt);
   const vehPos = state.vehicle === 'boat' ? state.boat.pos : state.drone.pos;
