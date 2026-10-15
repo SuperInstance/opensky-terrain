@@ -37,7 +37,7 @@ in your first commit and clear it in your last.
 ## In flight
 
 - 2026-10-14 — Z Lane: far view + fetch-timeout landed (`edf9d5d`, `46a9077`).
-- 2026-10-14 — Z Lane: RELEASE POLISH PASS in flight (the captain's word) — README rewrite to current state, repo test suites, full playtest of the live build, deployment verification. Touching: README.md, COORDINATION.md; explore.html only for surgical fixes, announced here first.
+- 2026-10-14 — Z Lane: release polish pass LANDED — README rewritten to current state (`e245f9e`); suites green (sim/mission/demo/watchdog); live build playtested; deployments byte-verified against HEAD. Nothing in flight.
 - 2026-10-14 — Coach Player session: M0 landed (`0244eb2`). Session may still be active in the shared tree — its uncommitted leftovers are duplicates of committed work; leave them.
 
 ## How to hail
