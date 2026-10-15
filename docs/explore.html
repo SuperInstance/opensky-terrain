@@ -13,7 +13,8 @@
   #stage{ position:fixed; inset:0; }
   canvas{ display:block; }
   .hud{ position:fixed; z-index:10; }
-  .title{ top:14px; left:16px; pointer-events:none; text-shadow:0 1px 8px rgba(0,0,0,.6); }
+  .title{ top:14px; left:16px; pointer-events:none; z-index:12; text-shadow:0 1px 8px rgba(0,0,0,.6); }
+  .title a.plain{ pointer-events:auto; }
   .title .kicker{ font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--accent); }
   .title h1{ margin:2px 0 2px; font-size:21px; font-weight:650; }
   .title .sub{ font-size:12.5px; color:var(--dim); max-width:420px; line-height:1.45; }
@@ -30,8 +31,9 @@
   #readout b{ color:var(--accent); font-weight:650; }
   #scene{ top:118px; left:16px; font-size:12.5px; line-height:1.75; min-width:250px; max-width:300px; }
   #scene h3{ margin:0 0 2px; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:650; }
-  #scene .obj{ color:var(--dim); }
-  #scene .obj.done{ color:var(--ink); }
+  #scene .obj{ color:var(--dim); opacity:.72; }
+  #scene .obj.done{ color:var(--ink); opacity:1; }
+  #scene .obj.active{ color:var(--accent); opacity:1; font-weight:600; }
   #scene .deb{ color:var(--dim); font-size:12px; border-top:1px solid rgba(255,255,255,.14); margin-top:4px; padding-top:4px; }
   #readout .warn{ color:#ff7a6b; font-weight:700; }
   #help{ right:14px; bottom:16px; font-size:12px; color:var(--dim); line-height:1.6; text-align:right; pointer-events:none; }
@@ -47,6 +49,19 @@
   #demoPill{ position:fixed; left:50%; transform:translateX(-50%); bottom:64px; z-index:30; display:none;
     font-size:13px; white-space:nowrap; max-width:94vw; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
   @media (max-width:700px){ #demoPill{ bottom:66px; font-size:12px; } }
+  /* the debrief: the finish lands as a card, not a line in a
+     corner panel — it stays until the player dismisses it */
+  #debrief{ position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:35;
+    display:none; width:min(430px,92vw); text-align:center; padding:20px 24px 16px;
+    border:1px solid var(--accent); border-radius:14px; background:rgba(8,24,36,.94);
+    box-shadow:0 12px 44px rgba(0,0,0,.5); }
+  #debrief.show{ display:block; }
+  #debrief h3{ margin:0 0 8px; font-size:19px; color:var(--accent); }
+  #debrief .dline{ font-size:14px; line-height:1.7; color:var(--ink); }
+  #debrief .dline.dim{ color:var(--dim); }
+  #debriefClose{ position:absolute; top:6px; right:6px; min-width:36px; min-height:36px;
+    background:none; border:none; font-size:15px; color:var(--dim); }
+  #debriefBtn{ margin-top:10px; }
   /* time acceleration: a clock setting, not a controller setting —
      the same fixed 1/60 steps, more of them per frame */
   #timeCtl{ position:fixed; left:50%; transform:translateX(-50%); bottom:14px; z-index:25;
@@ -109,7 +124,7 @@
   <button id="btnVoice">🔇 Guide voice: off</button>
 </div>
 
-<div class="hud panel" id="readout" title="Tap to fold or unfold the full readout"><div id="readoutSummary"></div><div id="readoutBody">…</div></div>
+<div class="hud panel" id="readout" title="Tap to fold or unfold the full readout" role="button" tabindex="0" aria-expanded="true" aria-label="Fold or unfold the instrument readout"><div id="readoutSummary"></div><div id="readoutBody">…</div></div>
 
 <div class="hud" id="help">
   <b>W</b> throttle / forward · <b>S</b> reverse · <b>A D</b> turn<br>
@@ -119,6 +134,7 @@
 
 <canvas id="minichart" width="148" height="148" title="Where you are — tap for the full chart"></canvas>
 <div id="demoPill" class="panel"><span id="pillTag">▶ <b>DEMO</b></span> · <span id="demoCap">…</span><span id="pillHint" style="color:var(--accent)"> · any key or tap — take control</span></div>
+<div id="debrief" role="dialog" aria-label="Mission debrief"><button id="debriefClose" aria-label="Dismiss the debrief">✕</button><h3 id="debriefTitle">★ Scene 1 complete</h3><div id="debriefBody"></div><button id="debriefBtn">Keep playing</button></div>
 <div id="timeCtl" class="panel"><span class="tcLabel">Time</span><button data-ts="1" class="active">1×</button><button data-ts="2">2×</button><button data-ts="4">4×</button><button data-ts="8">8×</button></div>
 <div id="stick"><div id="stickKnob"></div></div>
 <div id="vertBtns"><button id="btnUp">▲</button><button id="btnDown">▼</button></div>
@@ -186,7 +202,7 @@ const sampleBottom = (x, yEnu) => pack.sampleBottom(x, yEnu);
 // ---------- scene ----------
 const stage = document.getElementById('stage');
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));   // capped at 1.5 (was 2): on a high-DPR screen the old cap shaded ~1.8x the fragments of this one, for little visible gain at this scene's scale — the cap is real headroom on weak GPUs, at a slight softening on retina
 renderer.setSize(innerWidth, innerHeight);
 stage.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
@@ -798,6 +814,7 @@ const demo = demoCtl.demo;
 const demoSet = demoCtl.set, demoControl = demoCtl.control;
 let idleT = 0, userTouched = false, demoSuppress = false;
 const demoPillEl = document.getElementById('demoPill'), demoCapEl = document.getElementById('demoCap');
+const debriefEl = document.getElementById('debrief'), debriefTitleEl = document.getElementById('debriefTitle'), debriefBodyEl = document.getElementById('debriefBody');
 demoPillEl.addEventListener('pointerdown', () => stopDemo(true));
 function demoSay(t) { if (demo.cap !== t) { demo.cap = t; demoCapEl.textContent = t; } }
 function startDemo() {
@@ -814,6 +831,7 @@ function stopDemo(tookControl) {
   demo.on = false;
   input.throttle = 0; input.turn = 0; input.vert = 0; input.boost = false; input.brake = false;
   demoPillEl.style.display = 'none';
+  hideDebrief();   // taking the conn is also the debrief's dismissal
   btnDemoEl.textContent = '▶ Watch the demo';
   saveEnabled = true; idleT = 0;
   if (tookControl) flashNote('Your boat. W throttle · A/D steer · V takes the drone down.');
@@ -1039,6 +1057,37 @@ const sceneListEl = document.getElementById('sceneList');
 const sceneDebEl = document.getElementById('sceneDeb');
 const sceneNavEl = document.getElementById('sceneNav');
 let prevDone = [false, false, false, false, false, false];
+// Display latch for the objective list (see the HUD tick): an
+// objective once achieved stays shown achieved. Page-side only —
+// the mission rule still reads the raw conditions.
+const objLatch = [false, false, false, false, false, false];
+let debriefPopped = false, missionBannerShown = false;
+function showDebrief() {
+  if (debriefPopped) return;
+  debriefPopped = true;
+  const mm = Math.floor(state.time / 60), ss = String(Math.floor(state.time % 60)).padStart(2, '0');
+  const hull = F.takingWater ? 'taking water — she barely made it' : F.hullHits ? 'one hard strike on the hull' : 'hull clean — no strikes';
+  if (F.missionOver) {
+    debriefTitleEl.textContent = 'Scene over — she limped home';
+    debriefBodyEl.innerHTML =
+      `<div class="dline">✗ The Marigold's pot is still out there</div>` +
+      `<div class="dline dim">${mm}:${ss} on the clock · ${hull}</div>` +
+      `<div class="dline dim">Reset the run and bring her home cleaner.</div>`;
+    speak('She is home, but taking water. The pot is still out there.');
+  } else {
+    debriefTitleEl.textContent = '★ Scene 1 complete';
+    debriefBodyEl.innerHTML =
+      `<div class="dline">✓ The Marigold's pot — logged for the Marigold</div>` +
+      `<div class="dline">${F.wreckSeen ? '★ The wreck in the cove — filmed' : 'The wreck in the cove went unlogged'}</div>` +
+      `<div class="dline dim">${mm}:${ss} on the clock · ${hull}</div>` +
+      `<div class="dline dim">${F.reserveSpent ? 'The reserve third got spent out there.' : 'Home with the reserve third unspent — that is the discipline.'}</div>`;
+    speak(F.wreckSeen ? 'Scene complete. Pot logged, wreck filmed — beautifully done.' : 'Scene complete. The pot is logged and she is home.');
+  }
+  debriefEl.classList.add('show');
+}
+function hideDebrief() { debriefEl.classList.remove('show'); }
+document.getElementById('debriefClose').addEventListener('click', hideDebrief);
+document.getElementById('debriefBtn').addEventListener('click', hideDebrief);
 let saveEnabled = true;
 const camPos = new THREE.Vector3(4665, 8, -779);
 let hudTimer = 0;
@@ -1159,11 +1208,18 @@ function animate() {
       ['Bring her home — with the pot found', hDist(bt.pos, SPAWN) < 40 && F.potFound],
       ['★ Bonus: log the wreck in the cove', F.wreckSeen],
     ];
-    sceneListEl.innerHTML = OBJS.map(([txt, done]) =>
-      `<div class="obj ${done ? 'done' : ''}">${done ? '●' : '○'} ${txt}</div>`).join('');
+    // Three unmistakable states: ✓ achieved (latched for display —
+    // the raw conditions are positional, so the bay objective
+    // would otherwise un-tick the moment she sails out of the bay
+    // and read as flicker), ▸ the current objective in accent,
+    // ○ pending, dimmed. The mission rule (coreDone) still reads
+    // the raw conditions; only the display latches.
+    for (let i = 0; i < OBJS.length; i++) if (OBJS[i][1]) objLatch[i] = true;
+    const ni = [0, 1, 2, 3, 4, 5].find(i => !objLatch[i]);
+    sceneListEl.innerHTML = OBJS.map(([txt], i) =>
+      `<div class="obj ${objLatch[i] ? 'done' : i === ni ? 'active' : ''}">${objLatch[i] ? '✓' : i === ni ? '▸' : '○'} ${txt}</div>`).join('');
     OBJS.forEach(([txt, done], i) => { if (done && !prevDone[i]) flashNote('✓ ' + txt.split(' — ')[0]); prevDone[i] = done; });
     const NAVT = [[null, 'cast off — the bay lies east'], [BAYC, 'Jamestown Bay'], [BAYC, 'the shoal — Jamestown Bay'], [POT, 'the pot — follow the pinger'], [SPAWN, 'home — Western Anchorage'], [WRECK, 'the wreck cove']];
-    const ni = [0, 1, 2, 3, 4, 5].find(i => !OBJS[i][1]);
     const coreDone = [0, 1, 2, 3, 4].every(i => OBJS[i][1]);
     if (ni === undefined) sceneNavEl.textContent = 'Scene complete.';
     else {
@@ -1179,7 +1235,8 @@ function animate() {
     sceneNextEl.textContent = sceneNavEl.textContent;
     narrate(OBJS, ni);
     if (saveEnabled) try { localStorage.setItem('leadsman-run-v1', JSON.stringify({ b: [bt.pos.x, bt.pos.z, bt.theta], batt: d.battery, shoalTime: F.shoalTime, reserveSpent: F.reserveSpent, sceneDone, tide: state.tide, potFound: F.potFound, wreckSeen: F.wreckSeen, hullHits: F.hullHits, takingWater: F.takingWater })); } catch (e) {}
-    if (coreDone && !sceneDone) { sceneDone = true; flashNote('Scene 1 complete. Debrief below.'); }
+    if (coreDone && !sceneDone) { sceneDone = true; flashNote('Scene 1 complete.'); showDebrief(); }
+    if (F.missionOver && !missionBannerShown) { missionBannerShown = true; showDebrief(); }
     const mm = Math.floor(state.time / 60), ss = String(Math.floor(state.time % 60)).padStart(2, '0');
     sceneDebEl.textContent = F.missionOver
       ? 'Debrief: she limped home taking water, the pot still out there. Reset and run it cleaner.'
@@ -1255,11 +1312,12 @@ const sceneFoldBtn = document.getElementById('sceneFold');
 const tideToggleBtn = document.getElementById('tideToggle');
 function setSceneFold(folded) { scenePanel.classList.toggle('folded', folded); sceneFoldBtn.setAttribute('aria-expanded', String(!folded)); }
 function setTideFold(folded) { vehiclesPanel.classList.toggle('tideFolded', folded); tideToggleBtn.setAttribute('aria-expanded', String(!folded)); }
+function setReadoutFold(folded) { readoutPanel.classList.toggle('folded', folded); readoutPanel.setAttribute('aria-expanded', String(!folded)); }
 document.getElementById('sceneHead').addEventListener('click', () => setSceneFold(!scenePanel.classList.contains('folded')));
 tideToggleBtn.addEventListener('click', () => setTideFold(!vehiclesPanel.classList.contains('tideFolded')));
-readoutPanel.addEventListener('click', () => readoutPanel.classList.toggle('folded'));
+readoutPanel.addEventListener('click', () => setReadoutFold(!readoutPanel.classList.contains('folded')));
 if (matchMedia('(max-width: 700px)').matches) {   // narrow screens start decluttered; wide screens stay expanded
-  setSceneFold(true); setTideFold(true); readoutPanel.classList.add('folded');
+  setSceneFold(true); setTideFold(true); setReadoutFold(true);
 }
 
 if (new URLSearchParams(location.search).get('demo') === '1') demoSuppress = false;

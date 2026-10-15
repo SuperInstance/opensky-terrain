@@ -66,15 +66,17 @@
     <div class="kicker">Sitka Sound · real bathymetry · a game that plays itself</div>
     <h1>Watch her play.<br><span class="thin">Take the wheel when you're ready.</span></h1>
     <p class="sub">Shoalwater is a boat-and-drone game drawn over the real seafloor of Sitka Sound.
-    Press launch and the boat casts off on her own — she'll work the shoal, hunt a lost crab pot,
-    and feel her way into the cove. The moment you touch a key, a stick, anything — she's yours, exactly where she floats.</p>
+    Press launch and the F/V Eileen casts off on her own — she'll cross to Jamestown Bay, work the shoal
+    with her drone, hunt a lost crab pot by its pinger, feel her way into the cove to log the wreck,
+    and bring herself home. The moment you touch a key, a stick, anything — she's yours, exactly where she floats.</p>
   </header>
 
   <div id="stage">
     <div id="poster">
       <div class="depth">57.04° N · 135.29° W — JAMESTOWN BAY</div>
       <button id="launch">▶&nbsp; Launch the demo</button>
-      <p>She starts playing on her own a few seconds in. Watch as long as you like.
+      <p>She starts playing on her own a few seconds in. Watch as long as you like — run the
+      clock at up to 8× to see the whole job in minutes, or sit with her at 1×.
       Taking over is not a menu — it's just touching the controls.</p>
     </div>
     <iframe id="game" title="Shoalwater — Explore Sitka Sound" loading="lazy"
@@ -91,7 +93,9 @@
       <h2><span class="n">01</span>It plays itself</h2>
       <p>The autopilot drives <b>the same controls you do</b> — same throttle, same physics, no cheats and no rails.
       It's a real player made of code: it reads the keel depth, works the drone on a battery of thirds,
-      and creeps into shallow water the way a careful skipper would.</p>
+      stages close and charges before every dive, and creeps into shallow water the way a careful skipper would.
+      The boat is the <b>F/V Eileen</b>, a Sitka power troller with a sunken working cockpit — press <b>T</b>
+      and her trolling poles swing out to fish, or stow vertical so she can slip into her berth.</p>
     </div>
     <div class="card">
       <h2><span class="n">02</span>Touch anything — she's yours</h2>
@@ -101,7 +105,8 @@
     <div class="card">
       <h2><span class="n">03</span>She has a job</h2>
       <p>Scene 1: cast off, make Jamestown Bay, work the shoal with the drone — and find <b>the Marigold's lost crab pot</b>,
-      homing on its pinger. Log the wreck in the cove for the ★, then bring her home.
+      hunting its pinger the way the drone hears it: no return past 150 m, then bars that fill as she closes,
+      and a hold low over the cage to log it. Log the wreck in the cove for the ★, then bring her home.
       Mind the keel: two hard groundings and she's taking water.</p>
     </div>
   </div>
@@ -115,6 +120,9 @@
       <tr><td class="k">V</td><td>swap between the boat and the drone</td></tr>
       <tr><td class="k">R / F</td><td>drone: rise / sink</td></tr>
       <tr><td class="k">Shift</td><td>drone boost</td></tr>
+      <tr><td class="k">T</td><td>fold the trolling poles out to fish — or stow them vertical, lines slack, for the slip</td></tr>
+      <tr><td class="k">1× 2× 4× 8×</td><td>the clock (bottom centre): how fast time runs. The rate is real — the same fixed-step physics at every speed, just more of it per second</td></tr>
+      <tr><td class="k">buttons, top right</td><td>watch/stop the demo, the poles, and the guide voice — a local narrator who calls the next mark, the keel and the pinger off the same instruments you see. No cloud; it never leaves your browser</td></tr>
       <tr><td class="k">touch</td><td>on-screen stick and buttons; panels fold away on small screens</td></tr>
     </table>
     <p class="practice">Practice one piece at a time:
@@ -128,6 +136,12 @@
     <p>This demo is the seed of something bigger. <b>Coach Player</b> turns the autopilot into an avatar with a
     personality — one that studies how the best players play, develops its own style, narrates what it's doing,
     and takes direction from <b>you, the coach</b>: you set the plan, nudge its dials, and grab the wheel in the tight spots.</p>
+    <p>The first piece of that runtime already lives in this repo (<b>docs/coach/</b>): an overseer that picks
+    from a small library of proven moves — make way, work the shoal, hunt the pot by pinger alone, creep the cove
+    to the wreck — and judges each one cheaply, including the most important verdict: <i>none of these are good
+    enough</i>. It runs the whole mission headlessly in a test that completes every objective at a working tide —
+    and fails honestly, hull untouched, on the day the bar is dry. The show above is choreography; the coach
+    runtime is the same job flown by judgement instead, and it is the seed the avatar grows from.</p>
     <p>The design is public and in progress — two independent AI design passes, a question database of what makes
     play worth watching, and a runtime that lets the avatar write its own new moves under supervision.
     <a href="https://github.com/SuperInstance/coach-player">Follow it on GitHub →</a></p>
