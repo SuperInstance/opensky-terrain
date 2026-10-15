@@ -13,7 +13,8 @@ Then run the suite once before changing anything.
 **Run it:** serve `docs/` statically, open `explore.html`.
 **Test it** (repo root, Node ≥18, stdlib only, no install):
 `node tools/sim-selftest.mjs`, `harness.mjs`, `run-controls.mjs`,
-`demo-test.mjs`, `mission-test.mjs`, `boot-watchdog-test.mjs`.
+`demo-test.mjs`, `mission-test.mjs`, `boot-watchdog-test.mjs`,
+`m1-test.mjs`.
 
 ## The six hard rules
 
