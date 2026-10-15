@@ -1,50 +1,50 @@
 // session.js — run one Coach Player session headless over the core,
 // writing sessions/<id>/trace.jsonl (machine) and story.md (one
 // human-readable line per event, reason first). Used by the control
-// runs and the harness; the page will drive the same overseer live.
-import { mkdir, writeFile } from 'node:fs/promises';
+// runs and the harness; the page drives the same overseer live.
+//
+// M1: the session loads its thresholds from thresholds.json (the
+// data of record; built-in defaults if the file can't be read),
+// attaches a label store to the overseer (every decided situation
+// is labelled with its outcome), and afterwards runs a bounded
+// COUNTERFACTUAL pass: stored decision snapshots are replayed —
+// the picked tile under shifted water (±0.3 m of tide), and any
+// other claimant of the same intention the registry names — so
+// tiles and conditions never lived still earn labels. Labels land
+// in sessions/<id>/labels.jsonl beside the trace.
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { createGame, STEP, SPAWN, BAYC, WRECK } from '../core.js';
-import { createAdapter } from './adapter.js';
-import { createOverseer, HARVEST } from './overseer.js';
-import { createMakeWay, createWorkTheShoal, createHuntThePot, createWreckLook, SHOAL_POINT, SEARCH_AREA } from './tiles.js';
-import { JUDGES } from './judges.js';
+import { createGame, STEP, SPAWN, BAYC, WRECK } from '../core.js?v=2026-10-14.9';
+import { createAdapter } from './adapter.js?v=2026-10-14.9';
+import { createOverseer } from './overseer.js?v=2026-10-14.9';
+import { SHOAL_POINT, SEARCH_AREA } from './tiles.js?v=2026-10-14.9';
+import { JUDGES } from './judges.js?v=2026-10-14.9';
+import { buildDefaultPlan, buildFullMissionPlan, TILE_FACTORIES } from './plans.js?v=2026-10-14.9';
+import { resolveThresholds } from './thresholds.js?v=2026-10-14.9';
+import { createLabelStore, replaySituation } from './labels.js?v=2026-10-14.9';
+import { claimantsFor } from './registry.js?v=2026-10-14.9';
 
-export function buildDefaultPlan() {
-  return [
-    { label: 'make way to Jamestown Bay', intention: 'reach', valueRate: HARVEST.BAYC,
-      makeTile: () => createMakeWay({ x: BAYC.x, z: BAYC.z, speed: 5.4 }) },
-    { label: 'work the shoal', intention: 'work-shoal', valueRate: HARVEST.shoal,
-      makeTile: () => createWorkTheShoal() },
-    { label: 'bring her home', intention: 'reach-home', valueRate: HARVEST.SPAWN,
-      makeTile: () => createMakeWay({ x: SPAWN.x, z: SPAWN.z, speed: 5.4 }) },
-  ];
-}
-
-// The full mission: the whole Scene 1 job, end to end — bay, shoal,
-// the Marigold's pot, the wreck, and home. The bend/offer machinery
-// still fires where it fires (home follows the wreck, so the cove
-// mouth offer is scored from the cove itself — a short, honest bend).
-export function buildFullMissionPlan() {
-  return [
-    { label: 'make way to Jamestown Bay', intention: 'reach', valueRate: HARVEST.BAYC,
-      makeTile: () => createMakeWay({ x: BAYC.x, z: BAYC.z, speed: 5.4 }) },
-    { label: 'work the shoal', intention: 'work-shoal', valueRate: HARVEST.shoal,
-      makeTile: () => createWorkTheShoal() },
-    { label: 'hunt the pot', intention: 'hunt-pot', valueRate: HARVEST.pot,
-      makeTile: () => createHuntThePot() },
-    { label: 'look at the wreck', intention: 'wreck-look', valueRate: HARVEST.WRECK,
-      makeTile: () => createWreckLook() },
-    { label: 'bring her home', intention: 'reach-home', valueRate: HARVEST.SPAWN,
-      makeTile: () => createMakeWay({ x: SPAWN.x, z: SPAWN.z, speed: 5.4 }) },
-  ];
-}
+export { buildDefaultPlan, buildFullMissionPlan };
 
 const fmtT = (t) => `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+
+// The thresholds data of record, read from beside this module.
+// Any failure (missing file, bad JSON) falls back to the built-in
+// defaults — resolveThresholds only takes finite numbers for known
+// keys, so a corrupt file retunes nothing it shouldn't.
+export async function loadThresholds() {
+  try {
+    const text = await readFile(new URL('./thresholds.json', import.meta.url), 'utf8');
+    return resolveThresholds(JSON.parse(text));
+  } catch (e) {
+    return resolveThresholds(null);
+  }
+}
 
 export async function runSession({
   pack, judgeName = 'real', tide = 1.4, plan = null, maxMinutes = 120,
   sessionId = null, rootDir = 'sessions', writeLogs = true,
+  labels = null, counterfactuals = true,
 }) {
   const game = createGame(pack);
   game.state.tide = tide;
@@ -56,6 +56,12 @@ export async function runSession({
     { name: 'cove mouth', x: 8957, z: 596 }, { name: 'wreck', ...WRECK },
   ]);
 
+  const thresholds = await loadThresholds();
+  const store = labels || createLabelStore({
+    knnK: thresholds.knnK, alpha: thresholds.knnAlpha,
+    familiarMin: thresholds.familiarMinNeighbours, radius: thresholds.knnRadius,
+  });
+
   const trace = [], story = [];
   const emit = (kind, data, storyLine) => {
     trace.push({ t: +game.state.time.toFixed(2), kind, ...data });
@@ -63,7 +69,7 @@ export async function runSession({
   };
   const judge = JUDGES[judgeName];
   if (!judge) throw new Error('unknown judge: ' + judgeName);
-  const ov = createOverseer({ game, adapter, judge, emit });
+  const ov = createOverseer({ game, adapter, judge, emit, thresholds, labels: store });
   ov.begin(plan || buildDefaultPlan(), true);
 
   let groundings = 0, prevAground = false, prevHullHits = 0;
@@ -85,6 +91,42 @@ export async function runSession({
     prevAground = b.aground;
     prevHullHits = game.state.flags.hullHits;
   }
+
+  // ---- counterfactual pass (bounded by thresholds) ----
+  // For each decision snapshot: replay the picked tile under
+  // shifted water, and replay any OTHER claimant of the intention
+  // (the registry names them; with one claimant per intention that
+  // set is empty today, and the tide variants are what accrue).
+  let cfCount = 0;
+  if (counterfactuals) {
+    const cap = thresholds.counterfactualMaxReplays;
+    for (const dp of ov.decisionPoints) {
+      if (cfCount >= cap) break;
+      const ranFeatures = dp.features;
+      const jobs = [];
+      for (const dt of [0.3, -0.3]) {
+        jobs.push({ makeTile: dp.makeTile, tide: +(tide + dt).toFixed(2), features: { ...ranFeatures, tide: +(tide + dt).toFixed(2) } });
+      }
+      for (const claimant of claimantsFor(dp.intention)) {
+        if (claimant.tileId === dp.tileId) continue;
+        const factory = TILE_FACTORIES[claimant.tileId];
+        if (factory) jobs.push({ makeTile: () => factory({ makeTile: dp.makeTile }), tide, features: ranFeatures, tileId: claimant.tileId });
+      }
+      for (const job of jobs) {
+        if (cfCount >= cap) break;
+        const tile = job.makeTile();
+        const res = replaySituation({ pack, createGame, snapshot: dp.snapshot, tide: job.tide, tile });
+        store.add({
+          tile: tile.id, intention: dp.intention, features: job.features,
+          outcome: res.outcome, takeover: false, source: 'counterfactual', t: dp.t,
+        });
+        cfCount++;
+        emit('counterfactual', { tile: tile.id, intention: dp.intention, tide: job.tide, outcome: res.outcome },
+          `Counterfactual: ${tile.name} from the "${dp.intention}" decision at tide ${job.tide >= 0 ? '+' : ''}${job.tide} — ${res.outcome}.`);
+      }
+    }
+  }
+
   const simMinutes = game.state.time / 60;
   const objectives = game.objectives().map(([name, done]) => ({ name, done }));
   const report = {
@@ -103,6 +145,9 @@ export async function runSession({
     holdCountMax: ov.holdCountMax,
     exploratory: ov.exploratory,
     shadowOpportunities: ov.shadowOpportunities.length,
+    structuralMisfits: ov.structuralMisfits,
+    labels: store.counts(),
+    counterfactuals: cfCount,
     reserveSpent: game.state.flags.reserveSpent,
     batteryEnd: +game.state.drone.battery.toFixed(3),
   };
@@ -112,7 +157,8 @@ export async function runSession({
     await writeFile(join(dir, 'trace.jsonl'), trace.map(e => JSON.stringify(e)).join('\n') + '\n');
     await writeFile(join(dir, 'story.md'),
       `# Session ${sessionId} — judge ${judgeName}, tide ${tide >= 0 ? '+' : ''}${tide}\n\n` + story.join('\n') + '\n');
+    await writeFile(join(dir, 'labels.jsonl'), store.toJSONL());
     report.logs = dir;
   }
-  return { report, game, overseer: ov, trace, story };
+  return { report, game, overseer: ov, trace, story, labels: store };
 }

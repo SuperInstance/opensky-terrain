@@ -10,7 +10,7 @@
 // the adapter returns NaN for unmapped water, so a tile precondition
 // reading NaN is false, a corridor through NaN has probability 0, and
 // no safety signal can inherit the "assume deep" lie (HOST-DEFECT-01).
-import { SPAWN, POT, hDist } from '../core.js';
+import { SPAWN, POT, hDist } from '../core.js?v=2026-10-14.9';
 
 export function createAdapter(game, pack) {
   const tileAt = (x, z) => pack.tileAt(x, -z);

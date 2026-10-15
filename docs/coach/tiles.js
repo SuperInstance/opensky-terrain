@@ -7,7 +7,7 @@
 // demo's shoal step), with the M0 changes the design called for:
 // make-way's arrival is scale-relative, and work-the-shoal declares
 // its precondition and refuses where the water isn't there.
-import { BAYC, WRECK, clamp, fwdOf, hDist } from '../core.js';
+import { BAYC, WRECK, clamp, fwdOf, hDist } from '../core.js?v=2026-10-14.9';
 
 const wrapPi = (a) => { if (!Number.isFinite(a)) return 0; while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 // the boat's real speed under demoBoatTo's throttle mapping for a
@@ -501,6 +501,72 @@ export function createWreckLook() {
       if (tryRecover(game)) return F.wreckSeen ? 'done' : 'failed';
       st.backT = (st.backT || 0) + dt;
       if (st.backT > 240) return 'failed';
+      return 'running';
+    },
+  };
+}
+
+// ---------- hold-station: the reflex tile (authored, M1) ----------
+// Authored offline through the author-packet discipline — the
+// packet is filed at docs/coach/authored/hold-station.packet.json
+// (reasons first, per MiniMax's packet format; verification below).
+// The job it answers is the one the overseer itself kept hitting:
+// when nothing fits — a misfit pause, a keyhole, a coach's "hold
+// on" — M0 improvised the hold with a zeroed input and no tile
+// accountable for it. MiniMax's design names the missing piece
+// (§3.5): a reflex hold-station tile, no decision, no confidence.
+// This is that tile, claiming the 'hold-station' intention the
+// registry declares.
+//
+// Its contract differs from the work tiles in one declared way:
+// the precondition is { ok: true } ALWAYS. A reflex that can
+// decline is not a reflex — when the library has no move, something
+// must still be true, and this is it. (Fail-closed still binds its
+// navigation: station-keeping reads the adapter, and unmapped
+// water under the bow reads as shoal to the keel cap, as
+// everywhere.) What it does: if the drone is out, bring her home
+// aboard first (the recovery IS the safety act); then keep the
+// boat on her anchor point for the priced watch; then report done.
+// Failure discipline: the recovery leg is bounded like every back
+// phase (240 s) — a drone that cannot be recovered settles the
+// tile 'failed' with the loss admitted, never a hang.
+export function createHoldStation({ watchS = 60 } = {}) {
+  const st = { phase: 'recover', elapsed: 0, backT: 0, anchor: null, result: null };
+  return {
+    id: 'hold-station',
+    name: 'hold station',
+    claims: 'hold-station',
+    // priced in advance (the contract's cost line): the watch, in
+    // seconds of plan time, plus a bounded recovery if the drone
+    // is out. Nothing else is spent; the reserve is never touched.
+    costs: { watchS, recoveryCapS: 240 },
+    precondition() { return { ok: true }; },
+    start({ game }) { st.anchor = { x: game.state.boat.pos.x, z: game.state.boat.pos.z }; },
+    tick(ctx, dt) {
+      const { game, adapter } = ctx;
+      const d = game.state.drone, b = game.state.boat;
+      st.elapsed += dt;
+      // recover: the drone comes home aboard before anyone holds
+      // anything — reached from any state the tile can start in
+      if (st.phase === 'recover') {
+        if (game.state.vehicle === 'drone' || !d.aboard) {
+          if (game.state.vehicle !== 'drone' && !d.aboard) { /* drone out, boat in hand: take the drone's conn to fly her in */ game.switchVehicle('drone', 'runtime'); return 'running'; }
+          st.backT += dt;
+          droneTo(game, b.pos.x, game.state.tide - 2, b.pos.z);
+          if (tryRecover(game)) { st.phase = 'hold'; st.elapsed = 0; return 'running'; }
+          if (st.backT > 240) return 'failed';   // bounded: admit the loss, settle
+          return 'running';
+        }
+        st.phase = 'hold'; st.elapsed = 0;
+      }
+      // hold: keep her on the anchor for the priced watch. Drift
+      // past 25 m is walked back at creep, keel-capped like every
+      // boat phase; inside it, engines easy — the point of the
+      // tile is that nothing is being spent.
+      if (game.state.vehicle !== 'boat') { game.switchVehicle('boat', 'runtime'); return 'running'; }
+      if (st.elapsed >= watchS) { zeroInput(game); return 'done'; }
+      if (hDist(b.pos, st.anchor) > 25) boatTo(game, st.anchor.x, st.anchor.z, keelCappedSpeed(game, adapter, 1.3), st);
+      else zeroInput(game);
       return 'running';
     },
   };

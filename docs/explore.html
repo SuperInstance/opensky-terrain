@@ -94,6 +94,23 @@
     background:none; border:none; border-radius:0; padding:2px 0; font-size:11px; color:var(--dim); min-height:24px; }
   .tideToggle .chev{ font-size:12px; }
   #vehicles.tideFolded #tideBody{ display:none; }
+  /* The coach surface (M1): a section of the control column. The
+     strip is the always-visible face — the overseer's current read
+     in words; chips, echo and the order box live under it. On
+     phones the section is a pop-and-settle tenant (see
+     makePopSettle): settled shows the strip alone. */
+  #coachSection{ border-top:1px solid rgba(255,255,255,.14); padding-top:8px; display:flex; flex-direction:column; gap:6px; }
+  #coachSection[hidden]{ display:none; }
+  #coachStrip{ font-size:12.5px; line-height:1.45; color:var(--ink); cursor:pointer; }
+  #coachChips{ display:flex; flex-wrap:wrap; gap:4px; }
+  .coachChip{ font-size:11.5px; padding:5px 8px; }
+  .coachChip.current{ border-color:var(--accent); color:var(--accent); }
+  #coachEcho{ font-size:12.5px; line-height:1.45; background:rgba(255,180,84,.12); border:1px solid var(--accent); border-radius:8px; padding:6px 8px; }
+  #coachEcho[hidden]{ display:none; }
+  #coachEcho button{ margin-left:4px; }
+  .coachOrderRow{ display:flex; gap:4px; }
+  #coachOrder{ flex:1; min-width:0; background:rgba(10,20,28,.65); color:var(--ink); border:1px solid rgba(255,255,255,.25); border-radius:8px; padding:7px 8px; font-size:12.5px; }
+  #coachSection.settled #coachChips, #coachSection.settled .coachOrderRow, #coachSection.settled #coachEcho{ display:none; }
   #vehicles.tideFolded .tideToggle .chev{ transform:rotate(-90deg); }
   #readout{ cursor:pointer; -webkit-tap-highlight-color:transparent; }
   #readoutSummary{ display:none; white-space:nowrap; }
@@ -214,8 +231,16 @@ window.__bootTimer = setInterval(function () {
   <button class="tideToggle" id="tideToggle" aria-expanded="true" aria-label="Hide or show tide slider"><span>Tide <span id="tideVal">+1.4</span> m</span><span class="chev">▾</span></button>
   <div id="tideBody"><input type="range" id="tide" min="-1.5" max="4" step="0.1" value="1.4" aria-label="Tide height in metres"></div>
   <button id="btnDemo">▶ Watch the demo</button>
+  <button id="btnCoach">🧑‍🏫 Coach: off</button>
   <button id="btnPoles">🎣 Trolling poles: stowed</button>
   <button id="btnVoice">🔇 Guide voice: off</button>
+  <div id="coachSection" hidden>
+    <div id="coachStrip" title="The coach's current read — tap to fold or unfold the coach controls">The coach is off.</div>
+    <div id="coachChips"></div>
+    <div id="coachEcho" hidden><span id="coachEchoText"></span> <button id="coachEchoOk">Do it</button> <button id="coachEchoNo">Not that</button></div>
+    <div class="coachOrderRow"><input id="coachOrder" type="text" placeholder="Give an order — 'hunt the pot'…" aria-label="Type an order for the coach"><button id="coachOrderBtn">Order</button></div>
+    <button id="coachResume" hidden>▶ Resume coach</button>
+  </div>
 </div>
 
 <div class="hud panel" id="readout" title="Tap to fold or unfold the full readout" role="button" tabindex="0" aria-expanded="true" aria-label="Fold or unfold the instrument readout"><div id="readoutSummary"></div><div id="readoutBody">…</div></div>
@@ -242,25 +267,38 @@ window.__bootTimer = setInterval(function () {
 <script type="module">
 import * as THREE from 'three';
 // MODULE GRAPH VERSION — every local module in this page's graph
-// (qm.js, core.js, demo.js, and demo.js's own import of core.js)
-// carries the same ?v= stamp. GitHub Pages serves these files with a
-// short cache TTL but no per-deploy invalidation, so a device can
-// hold a STALE copy of one module beside a FRESH copy of another;
-// the torn graph then fails to link and the page dies silently
-// behind the loading veil (seen 2026-10-14: worked in the afternoon,
-// dead in the evening, fine on every fresh-profile test rig).
+// (qm.js, core.js, demo.js, the coach runtime under coach/, and
+// their own imports of core.js / each other) carries the same ?v=
+// stamp. GitHub Pages serves these files with a short cache TTL
+// but no per-deploy invalidation, so a device can hold a STALE
+// copy of one module beside a FRESH copy of another; the torn
+// graph then fails to link and the page dies silently behind the
+// loading veil (seen 2026-10-14: worked in the afternoon, dead in
+// the evening, fine on every fresh-profile test rig).
 // Stamping every intra-graph edge with one version makes the graph
 // atomic: any cached piece pulls its own generation of the rest, so
 // the worst case is last deploy's working build, never a dead page.
 // BUMP RULE: raise the stamp on EVERY deploy that changes any file
-// in the graph (explore.html, qm.js, core.js, demo.js), all edges
-// together, and keep demo.js's core.js stamp in step.
-import { decodeQuantizedMeshTile } from './qm.js?v=2026-10-14.8';
+// in the graph (explore.html, qm.js, core.js, demo.js, coach/*.js),
+// all edges together, and keep the coach modules' own stamps in
+// step (they are stamped identically so Node and the page resolve
+// the same single instances).
+import { decodeQuantizedMeshTile } from './qm.js?v=2026-10-14.9';
 // The simulation core is shared with the headless tools (M0 extraction):
 // same physics in the page and in Node. Anchors come from the core so
 // the page, the sim and the coach runtime can never drift apart.
-import { createPack, gridFromTile, createGame, SPAWN, BAYC, WRECK, POT, STEP } from './core.js?v=2026-10-14.8';
-import { createDemo } from './demo.js?v=2026-10-14.8';
+import { createPack, gridFromTile, createGame, SPAWN, BAYC, WRECK, POT, STEP } from './core.js?v=2026-10-14.9';
+import { createDemo } from './demo.js?v=2026-10-14.9';
+// The Coach Player runtime (M1): the same overseer, plans, tiles,
+// label store and order interpreter the headless sessions verify.
+// The coach surface below drives them live against this page's game.
+import { createAdapter } from './coach/adapter.js?v=2026-10-14.9';
+import { createOverseer } from './coach/overseer.js?v=2026-10-14.9';
+import { JUDGES } from './coach/judges.js?v=2026-10-14.9';
+import { buildFullMissionPlan } from './coach/plans.js?v=2026-10-14.9';
+import { createLabelStore } from './coach/labels.js?v=2026-10-14.9';
+import { interpret } from './coach/interpreter.js?v=2026-10-14.9';
+import { resolveThresholds } from './coach/thresholds.js?v=2026-10-14.9';
 
 // Boot watchdog plumbing (the watchdog itself is the inline script
 // above): failures on the boot path become an honest panel instead
@@ -876,6 +914,7 @@ function syncVehicleUI() {
 // the demo — a runtime switch (the demo's own, later the coach's)
 // never triggers a takeover.
 function uiSwitchVehicle(v, source) {
+  if (source === 'player' && coachOv) coachOv.possessed = true;   // a player's switch is the player asserting: the coach stands down
   if (source === 'player' && demo.on) { stopDemo(true); return; }
   game.switchVehicle(v, source);
   drainEvents();
@@ -885,7 +924,7 @@ function uiSwitchVehicle(v, source) {
 btnBoat.addEventListener('click', () => uiSwitchVehicle('boat', 'player'));
 btnDrone.addEventListener('click', () => uiSwitchVehicle('drone', 'player'));
 const btnDemoEl = document.getElementById('btnDemo');
-btnDemoEl.addEventListener('click', () => { if (demo.on) stopDemo(true); else startDemo(); });
+btnDemoEl.addEventListener('click', () => { if (demo.on) stopDemo(true); else { coachSet(false); startDemo(); } });   // demo and coach never run at once
 document.getElementById('tide').addEventListener('input', (e) => {
   state.tide = parseFloat(e.target.value);
   document.getElementById('tideVal').textContent = (state.tide >= 0 ? '+' : '') + state.tide.toFixed(1);
@@ -1344,9 +1383,14 @@ function animate() {
   simLast = simNow;
   simAcc += wallDt * timeScale;
   if (!demo.on) readKeys();
+  // Coach possession: the moment the player drives — keys, stick,
+  // vert buttons — the overseer stands down (its own gate does the
+  // rest; the wheel is the player's until they hand it back).
+  if (coachOv && !coachOv.possessed && playerDriving()) coachOv.possessed = true;
   let guard = 0;
   while (simAcc >= STEP && guard++ < 480) {
     if (demo.on) demoControl(STEP);
+    else if (coachOv) coachOv.tick(STEP);
     idleT += STEP;
     if (!demo.on && !demoSuppress && idleT > 90) startDemo();   // attract: a quiet screen starts telling the story
     game.step(STEP);
@@ -1537,6 +1581,132 @@ document.getElementById('resetRun').addEventListener('click', (e) => {
   }
   if (!startParam && !restoredRun && !wasReset) flashNote("Scene 1: the Marigold's pot is lost in the bay — its pinger is live. V takes the drone down.");
 }
+// ---------- the coach surface (M1) ----------
+// The Coach Player runtime, live: the same overseer, plans, tiles,
+// label store and order interpreter the headless sessions verify
+// (docs/coach/), driven against this page's game. Three
+// instruments: TILE CHIPS (the plan's legs — press one to send the
+// plan there; the current chip carries the fit as a WORD, never a
+// number: no judge has passed a calibration gate), the INTENT
+// STRIP (the overseer's current read — current tile, why, and the
+// misfit state when there is one), and the ORDER BOX (typed orders
+// resolved against a closed vocabulary and echoed in template
+// words; nothing applies until the coach confirms, and nothing
+// typed leaves this device — the interpreter is local, its LLM
+// seam shut pending the owner's privacy ruling). Possession is the
+// standing rule: the player drives, the coach stands down.
+const btnCoachEl = document.getElementById('btnCoach');
+const coachSectionEl = document.getElementById('coachSection');
+const coachStripEl = document.getElementById('coachStrip');
+const coachChipsEl = document.getElementById('coachChips');
+const coachOrderEl = document.getElementById('coachOrder');
+const coachEchoEl = document.getElementById('coachEcho');
+const coachEchoTextEl = document.getElementById('coachEchoText');
+const coachEchoOkEl = document.getElementById('coachEchoOk');
+const coachResumeEl = document.getElementById('coachResume');
+let coachOv = null, coachPlan = null, coachStoreInst = null, coachThresholdsJson = null, coachStripText = '', coachChipsSig = '', pendingOrder = null;
+// The thresholds file is coach data, not boot data: a failed fetch
+// leaves the runtime on its built-in defaults (identical values)
+// and never touches the boot watchdog.
+fetch('coach/thresholds.json').then(r => r.ok ? r.json() : null).then(j => { coachThresholdsJson = j; }).catch(() => {});
+let labelSaveTimer = null;
+function persistCoachLabels() {
+  if (labelSaveTimer) return;
+  labelSaveTimer = setTimeout(() => { labelSaveTimer = null; try { localStorage.setItem('coach-labels-v1', coachStoreInst.toJSONL()); } catch (e) {} }, 1000);
+}
+function coachStore() {
+  if (!coachStoreInst) {
+    const T = resolveThresholds(coachThresholdsJson);
+    coachStoreInst = createLabelStore({ knnK: T.knnK, alpha: T.knnAlpha, familiarMin: T.familiarMinNeighbours, radius: T.knnRadius, maxRows: 500, onAdd: persistCoachLabels });
+    try { const saved = localStorage.getItem('coach-labels-v1'); if (saved) coachStoreInst.loadJSONL(saved); } catch (e) {}
+  }
+  return coachStoreInst;
+}
+function playerDriving() {
+  return !!(keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD || keys.ArrowUp || keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight || keys.KeyR || keys.KeyF || keys.Space || stickId !== null || input.touchVert !== 0);
+}
+const coachCtl = makePopSettle((open) => coachSectionEl.classList.toggle('settled', !open), 4000, 6000);
+coachStripEl.addEventListener('click', () => coachCtl.tap());
+function coachSet(on) {
+  if (on) {
+    if (demo.on) stopDemo(true);
+    demoSuppress = true;   // the attract never starts the show over a coached run
+    coachOv = createOverseer({ game, adapter: createAdapter(game, pack), judge: JUDGES.real, emit: () => {}, thresholds: coachThresholdsJson, labels: coachStore() });
+    coachPlan = buildFullMissionPlan();
+    coachOv.begin(coachPlan, false);
+    coachSectionEl.hidden = false;
+    btnCoachEl.textContent = '🧑‍🏫 Coach: on';
+    btnCoachEl.classList.add('active');
+    coachStripText = ''; coachChipsSig = '';
+    coachRender();
+  } else {
+    if (coachOv) { const i = game.input; i.throttle = 0; i.turn = 0; i.vert = 0; i.boost = false; i.brake = false; }
+    coachOv = null; coachPlan = null; pendingOrder = null;
+    coachEchoEl.hidden = true;
+    coachSectionEl.hidden = true;
+    btnCoachEl.textContent = '🧑‍🏫 Coach: off';
+    btnCoachEl.classList.remove('active');
+  }
+}
+btnCoachEl.addEventListener('click', () => coachSet(!coachOv));
+coachResumeEl.addEventListener('click', () => { if (coachOv) { coachOv.possessed = false; coachRender(); } });
+const CHIP_NAMES = { reach: 'make way', 'reach-home': 'bring her home', 'work-shoal': 'work the shoal', 'hunt-pot': 'hunt the pot', 'wreck-look': 'look at the wreck', detour: 'cove detour', 'hold-station': 'hold station' };
+function coachRender() {
+  if (!coachOv) return;
+  const r = coachOv.read();
+  let line;
+  if (r.finished) line = 'Plan complete — the coach has nothing left to run.';
+  else if (r.possessed) line = 'You have the wheel — the coach is standing by.';
+  else if (r.misfit) line = r.misfit.structural ? `No move: ${r.misfit.reason}` : `No move good enough — holding station.${r.reasons[0] ? ' ' + r.reasons[0] : ''}`;
+  else if (r.phase === 'coach-hold') line = 'Holding station, on your order.';
+  else if (r.tileName) line = `${r.tileName} — ${r.fitWord}${r.reasons[0] ? ' · ' + r.reasons[0] : ''}`;
+  else line = `${r.legLabel || 'the plan'} — ${r.fitWord}`;
+  if (line !== coachStripText) { coachStripText = line; coachStripEl.textContent = line; coachCtl.poke(); }
+  coachResumeEl.hidden = !r.possessed;
+  const sig = r.plan.map(p => p.status).join(',') + '|' + r.legIndex + '|' + r.fitWord + '|' + r.finished;
+  if (sig !== coachChipsSig) {
+    coachChipsSig = sig;
+    coachChipsEl.innerHTML = '';
+    r.plan.forEach((p, i) => {
+      const b = document.createElement('button');
+      b.className = 'coachChip' + (i === r.legIndex && !r.finished ? ' current' : '');
+      b.textContent = `${p.status === 'done' ? '✓' : i === r.legIndex && !r.finished ? '▸' : '○'} ${CHIP_NAMES[p.intention] || p.intention}${i === r.legIndex && !r.finished ? ' · ' + r.fitWord : ''}`;
+      b.title = p.label;
+      b.disabled = p.status === 'done';
+      b.addEventListener('click', () => { if (coachOv) { coachOv.possessed = false; coachOv.coachGoTo(i); coachRender(); } });
+      coachChipsEl.appendChild(b);
+    });
+  }
+}
+setInterval(coachRender, 250);
+function coachOrderSubmit() {
+  const text = coachOrderEl.value;
+  if (!text.trim()) return;
+  pendingOrder = interpret(text, { planIntentions: coachPlan ? coachPlan.map(l => l.intention) : [] });
+  coachEchoTextEl.textContent = pendingOrder.template;
+  coachEchoOkEl.disabled = pendingOrder.kind === 'none' || pendingOrder.applicable === false;
+  coachEchoEl.hidden = false;
+  coachCtl.poke();
+}
+document.getElementById('coachOrderBtn').addEventListener('click', coachOrderSubmit);
+coachOrderEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') coachOrderSubmit(); });
+coachEchoOkEl.addEventListener('click', () => {
+  const o = pendingOrder; pendingOrder = null; coachEchoEl.hidden = true;
+  if (!o) return;
+  if (!coachOv && o.kind !== 'dial') coachSet(true);
+  if (o.kind === 'intention') {
+    if (o.intention === 'hold-station' && !o.inPlan) { if (coachOv) coachOv.holdStation(60); }
+    else if (coachOv && coachPlan) { const i = coachPlan.findIndex(l => l.intention === o.intention); if (i >= 0) { coachOv.possessed = false; coachOv.coachGoTo(i); } }
+  } else if (o.kind === 'control' && coachOv) {
+    coachOv.possessed = o.verb === 'stand-down';
+  } else if (o.kind === 'dial' && o.name === 'time') {
+    const btn = document.querySelector(`#timeCtl button[data-ts="${o.value}"]`); if (btn) btn.click();
+  }
+  coachOrderEl.value = '';
+  coachRender();
+});
+document.getElementById('coachEchoNo').addEventListener('click', () => { pendingOrder = null; coachEchoEl.hidden = true; });
+
 // ---------- collapsible overlays (player-first: the world gets the screen) ----------
 const scenePanel = document.getElementById('scene');
 const vehiclesPanel = document.getElementById('vehicles');

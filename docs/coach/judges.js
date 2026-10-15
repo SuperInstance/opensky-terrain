@@ -38,6 +38,15 @@ const realJudge = {
       const fit = Math.min(0.95, Math.max(0.05, 0.5 + (pre.depth - 2.0) * 0.03 + battery * 0.2));
       return { fit, reasons: [`the drainage carries ${pre.depth.toFixed(1)} m of water to hunt in`, `drone battery ${Math.round(battery * 100)}% (the tile tops it up first)`] };
     }
+    if (tile.id === 'hold-station') {
+      const d = game.state.drone;
+      // the reflex's fit is about exposure: a drone out on a falling
+      // battery is the situation this tile exists for; a quiet boat
+      // with everything aboard can always hold, unremarkably
+      if (!d.aboard && d.battery < 0.5) return { fit: 0.9, reasons: [`the drone is out on ${Math.round(d.battery * 100)}% — bring her in and hold`] };
+      if (!d.aboard) return { fit: 0.75, reasons: ['the drone is out — recover her and hold station'] };
+      return { fit: 0.55, reasons: ['everything is aboard and she can hold where she lies'] };
+    }
     if (tile.id === 'wreck-look') {
       const pre = tile.precondition({ game, adapter });
       const fit = Math.min(0.92, Math.max(0.05, 0.62 + (pre.depth - 1.35) * 0.25));
