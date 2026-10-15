@@ -43,13 +43,16 @@
   #loading .bootBox{ max-width:min(430px,92vw); text-align:center; line-height:1.55; padding:0 18px; }
   #loading .bootBox button{ margin-top:14px; }
   #stick{ position:fixed; left:18px; bottom:96px; width:128px; height:128px; border-radius:50%;
-    border:1.5px solid rgba(255,255,255,.35); background:rgba(255,255,255,.06); z-index:20; display:none; }
+    border:1.5px solid rgba(255,255,255,.35); background:rgba(255,255,255,.06); z-index:20; display:none;
+    transition:opacity .45s ease; }
+  #stick.idle{ opacity:.25; }
   #stickKnob{ position:absolute; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35);
     left:37px; top:37px; pointer-events:none; }
   #vertBtns{ position:fixed; right:16px; bottom:150px; z-index:20; display:none; flex-direction:column; gap:10px; }
   #vertBtns button{ width:62px; height:62px; border-radius:50%; font-size:22px; }
   #demoPill{ position:fixed; left:50%; transform:translateX(-50%); bottom:64px; z-index:30; display:none;
     font-size:13px; white-space:nowrap; max-width:94vw; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+  #pillChip{ display:none; }
   @media (max-width:700px){ #demoPill{ bottom:66px; font-size:12px; } }
   /* the debrief: the finish lands as a card, not a line in a
      corner panel — it stays until the player dismisses it */
@@ -97,9 +100,34 @@
   #readout.folded #readoutSummary{ display:block; }
   #readout.folded #readoutBody{ display:none; }
   @media (max-width:700px){ #help{ display:none; } .title .sub{ display:none; } .title h1{ font-size:16px; }
-    #scene{ top:82px; min-width:0; max-width:calc(100vw - 232px); } #readout{ min-width:0; max-width:calc(100vw - 178px); }
+    #scene{ top:82px; min-width:0; max-width:calc(100vw - 232px); }
     .tideToggle{ min-height:40px; } #stick{ bottom:204px; } #vertBtns{ bottom:216px; }
-    #readout.folded #readoutSummary{ white-space:normal; } }
+    /* The phone bottom, re-plotted: the CHART is sovereign. It owns
+       the bottom-right box (right 10, 168 wide, full height from the
+       bottom edge) and nothing else may enter it — the freed room
+       from the declutter below is what pays for its growth from
+       148 to 168. Everything else stacks in the left column in
+       strict bottom-up bands that cannot overlap: TIME (a control,
+       always out, slimmed) at the very bottom, the readout chip
+       above it, the caption chip above that. The two informational
+       elements live as chips and pop open on change, then settle
+       (see makePopSettle in the module); warnings pin them open. */
+    #minichart{ width:168px; height:168px; right:10px; bottom:calc(10px + env(safe-area-inset-bottom, 0px)); }
+    #timeCtl{ left:10px; transform:none; bottom:calc(10px + env(safe-area-inset-bottom, 0px)); padding:4px 6px; }
+    #timeCtl .tcLabel{ display:none; }
+    #timeCtl button{ padding:5px 9px; }
+    #readout{ left:10px; min-width:0; max-width:calc(100vw - 196px); bottom:calc(58px + env(safe-area-inset-bottom, 0px));
+      max-height:40vh; overflow-y:auto; touch-action:auto; }
+    #readout.folded #readoutSummary{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #demoPill{ left:10px; transform:none; bottom:calc(108px + env(safe-area-inset-bottom, 0px));
+      max-width:calc(100vw - 196px); white-space:normal; }
+    #demoPill.settled{ white-space:nowrap; }
+    #demoPill.settled #demoCap, #demoPill.settled #pillHint{ display:none; }
+    #demoPill.settled #pillChip{ display:inline; color:var(--dim); }
+    #scene.popflash{ animation:scenePop 1.8s ease; }
+    #scene.popflash #sceneNext{ color:var(--accent); } }
+  @keyframes scenePop{ 0%{ box-shadow:0 0 0 2px var(--accent), 0 0 16px rgba(255,180,84,.5); }
+    100%{ box-shadow:0 0 0 0 rgba(255,180,84,0); } }
 </style>
 </head>
 <body>
@@ -199,7 +227,7 @@ window.__bootTimer = setInterval(function () {
 </div>
 
 <canvas id="minichart" width="148" height="148" title="Where you are — tap for the full chart"></canvas>
-<div id="demoPill" class="panel"><span id="pillTag">▶ <b>DEMO</b></span> · <span id="demoCap">…</span><span id="pillHint" style="color:var(--accent)"> · any key or tap — take control</span></div>
+<div id="demoPill" class="panel"><span id="pillTag">▶ <b>DEMO</b></span> · <span id="demoCap">…</span><span id="pillChip"></span><span id="pillHint" style="color:var(--accent)"> · any key or tap — take control</span></div>
 <div id="debrief" role="dialog" aria-label="Mission debrief"><button id="debriefClose" aria-label="Dismiss the debrief">✕</button><h3 id="debriefTitle">★ Scene 1 complete</h3><div id="debriefBody"></div><button id="debriefBtn">Keep playing</button></div>
 <div id="timeCtl" class="panel"><span class="tcLabel">Time</span><button data-ts="1" class="active">1×</button><button data-ts="2">2×</button><button data-ts="4">4×</button><button data-ts="8">8×</button></div>
 <div id="stick"><div id="stickKnob"></div></div>
@@ -227,12 +255,12 @@ import * as THREE from 'three';
 // BUMP RULE: raise the stamp on EVERY deploy that changes any file
 // in the graph (explore.html, qm.js, core.js, demo.js), all edges
 // together, and keep demo.js's core.js stamp in step.
-import { decodeQuantizedMeshTile } from './qm.js?v=2026-10-14.7';
+import { decodeQuantizedMeshTile } from './qm.js?v=2026-10-14.8';
 // The simulation core is shared with the headless tools (M0 extraction):
 // same physics in the page and in Node. Anchors come from the core so
 // the page, the sim and the coach runtime can never drift apart.
-import { createPack, gridFromTile, createGame, SPAWN, BAYC, WRECK, POT, STEP } from './core.js?v=2026-10-14.7';
-import { createDemo } from './demo.js?v=2026-10-14.7';
+import { createPack, gridFromTile, createGame, SPAWN, BAYC, WRECK, POT, STEP } from './core.js?v=2026-10-14.8';
+import { createDemo } from './demo.js?v=2026-10-14.8';
 
 // Boot watchdog plumbing (the watchdog itself is the inline script
 // above): failures on the boot path become an honest panel instead
@@ -772,7 +800,14 @@ function readKeys() {
 const stick = document.getElementById('stick'), knob = document.getElementById('stickKnob');
 let stickId = null, lookId = null, lookLast = { x: 0, y: 0 };
 const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
-if (IS_TOUCH) stick.style.display = 'block';
+const SMALL = matchMedia('(max-width: 700px)').matches;   // the phone layout: the chart is sovereign and the informational panels live as pop-and-settle chips (see makePopSettle)
+if (IS_TOUCH) { stick.style.display = 'block'; stick.classList.add('idle'); }   // the stick starts ghosted; a grab wakes it
+// The stick is a control you reach for, not scenery: full opacity
+// while a thumb is on it, ghosted to ~25% a few seconds after
+// release (and until first touched).
+let stickIdleTimer = null;
+function stickWake() { stick.classList.remove('idle'); if (stickIdleTimer) { clearTimeout(stickIdleTimer); stickIdleTimer = null; } }
+function stickSleep() { if (stickIdleTimer) clearTimeout(stickIdleTimer); stickIdleTimer = setTimeout(() => stick.classList.add('idle'), 3000); }
 function stickCenter() { const r = stick.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
 const vertBtns = document.getElementById('vertBtns');
 addEventListener('touchstart', (e) => {
@@ -783,6 +818,7 @@ addEventListener('touchstart', (e) => {
     const onStick = t.clientX >= sr.left - 14 && t.clientX <= sr.right + 14
       && t.clientY >= sr.top - 14 && t.clientY <= sr.bottom + 14;
     const onUi = t.target.closest && t.target.closest('.hud, #vertBtns, button, input');
+    if (onStick) stickWake();
     if (onStick && stickId === null) stickId = t.identifier;
     else if (!onUi && lookId === null) { lookId = t.identifier; lookLast = { x: t.clientX, y: t.clientY }; }
   }
@@ -806,7 +842,7 @@ addEventListener('touchmove', (e) => {
 }, { passive: true });
 addEventListener('touchend', (e) => {
   for (const t of e.changedTouches) {
-    if (t.identifier === stickId) { stickId = null; knob.style.left = '37px'; knob.style.top = '37px'; input.throttle = 0; input.turn = 0; }
+    if (t.identifier === stickId) { stickId = null; knob.style.left = '37px'; knob.style.top = '37px'; input.throttle = 0; input.turn = 0; stickSleep(); }
     if (t.identifier === lookId) lookId = null;
   }
 });
@@ -932,7 +968,7 @@ let idleT = 0, userTouched = false, demoSuppress = false;
 const demoPillEl = document.getElementById('demoPill'), demoCapEl = document.getElementById('demoCap');
 const debriefEl = document.getElementById('debrief'), debriefTitleEl = document.getElementById('debriefTitle'), debriefBodyEl = document.getElementById('debriefBody');
 demoPillEl.addEventListener('pointerdown', () => stopDemo(true));
-function demoSay(t) { if (demo.cap !== t) { demo.cap = t; demoCapEl.textContent = t; } }
+function demoSay(t) { if (demo.cap !== t) { demo.cap = t; demoCapEl.textContent = t; pillPoke(t); } }
 function startDemo() {
   if (demo.on) return;
   demo.on = true; demoSet(0);
@@ -971,15 +1007,22 @@ function buildMinichart() {
   }
   cx.putImageData(img, 0, 0);
 }
-const chartCtx = document.getElementById('minichart').getContext('2d');
-document.getElementById('minichart').addEventListener('click', () => window.open('./', '_blank'));
+const chartEl = document.getElementById('minichart');
+// On a phone the chart is the impressive part — it gets the room
+// the decluttered bottom freed: 168 px backing store to match its
+// 168 CSS px (see the ≤700px rules). Desktop keeps 148. The draw
+// below is parameterized on the canvas size, so both are exact.
+if (SMALL) { chartEl.width = 168; chartEl.height = 168; }
+const chartCtx = chartEl.getContext('2d');
+chartEl.addEventListener('click', () => window.open('./', '_blank'));
 function drawMinichart(focus) {
+  const S = chartEl.width;
   const fx = (focus.x - CH.x0) / CH.m, fy = (CH.yTop + focus.z) / CH.m;
-  const sx = THREE.MathUtils.clamp(fx - 74, 0, CH.w - 148), sy = THREE.MathUtils.clamp(fy - 74, 0, CH.h - 148);
-  chartCtx.drawImage(chartBg, sx, sy, 148, 148, 0, 0, 148, 148);
+  const sx = THREE.MathUtils.clamp(fx - S / 2, 0, CH.w - S), sy = THREE.MathUtils.clamp(fy - S / 2, 0, CH.h - S);
+  chartCtx.drawImage(chartBg, sx, sy, S, S, 0, 0, S, S);
   const mark = (x, z, draw) => {
     const mx = (x - CH.x0) / CH.m - sx, my = (CH.yTop + z) / CH.m - sy;
-    if (mx < -6 || mx > 154 || my < -6 || my > 154) return;
+    if (mx < -6 || mx > S + 6 || my < -6 || my > S + 6) return;
     chartCtx.save(); chartCtx.translate(mx, my); draw(); chartCtx.restore();
   };
   mark(SPAWN.x, SPAWN.z, () => { chartCtx.fillStyle = '#cfd8dc'; chartCtx.beginPath(); chartCtx.arc(0, 0, 3, 0, 7); chartCtx.fill(); });
@@ -992,8 +1035,8 @@ function drawMinichart(focus) {
     chartCtx.beginPath(); chartCtx.moveTo(0, -5.5); chartCtx.lineTo(3.8, 4.2); chartCtx.lineTo(-3.8, 4.2); chartCtx.closePath(); chartCtx.fill(); chartCtx.stroke();
   });
   chartCtx.fillStyle = 'rgba(234,243,248,.9)'; chartCtx.font = '9px system-ui';
-  chartCtx.fillText('CHART', 5, 11); chartCtx.fillText('N ↑', 126, 11);
-  chartCtx.fillRect(5, 141, 42, 2); chartCtx.fillText('500 m', 5, 137);
+  chartCtx.fillText('CHART', 5, 11); chartCtx.fillText('N ↑', S - 22, 11);
+  chartCtx.fillRect(5, S - 7, 42, 2); chartCtx.fillText('500 m', 5, S - 11);
 }
 
 // ---------- the far view (full-extent overview pack) ----------
@@ -1083,6 +1126,68 @@ function setPillMode(mode) {
   if (mode === 'demo') { pillTagEl.innerHTML = '▶ <b>DEMO</b>'; pillHintEl.style.display = ''; }
   else { pillTagEl.innerHTML = '🧭 <b>GUIDE</b>'; pillHintEl.style.display = 'none'; }
 }
+// ---------- pop-and-settle chips (small screens) ----------
+// The owner's phone rule: the bottom of the screen belongs to the
+// chart. On a narrow screen the informational elements at the
+// bottom — the caption pill and the instrument readout — live as
+// slim chips in the left column. When their content changes they
+// POP open, hold a few seconds, then settle back to the chip;
+// tapping a chip re-opens it (until tapped again, or a longer hold
+// runs out). A live WARNING pins its element open — safety
+// information never auto-hides. One small behaviour, two tenants
+// (setForm is each element's own expand/collapse switch), plus a
+// pulse for the scene panel's folded Next line. On wide screens
+// nothing here engages: the panels keep their always-open forms
+// and their manual fold controls, exactly as before.
+function makePopSettle(setForm, popMs, tapMs, startOpen = true) {
+  let open = startOpen, hold = false, timer = null;
+  const disarm = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  const arm = (ms) => { disarm(); if (!hold) timer = setTimeout(() => { timer = null; if (!hold) { open = false; setForm(false); } }, ms); };
+  return {
+    poke() { if (!SMALL) return; open = true; setForm(true); arm(popMs); },   // content changed: show it, then settle
+    tap() {
+      if (!SMALL) return;
+      if (hold) { open = true; setForm(true); return; }   // a pinned element stays open; the tap changes nothing
+      if (open) { open = false; disarm(); setForm(false); }
+      else { open = true; setForm(true); arm(tapMs); }
+    },
+    setHold(h) {
+      if (!SMALL) return;
+      if (h === hold) { if (h && !open) { open = true; setForm(true); } return; }
+      hold = h;
+      if (hold) { disarm(); open = true; setForm(true); }   // the warning arrives: out, and STAY out
+      else if (open) arm(popMs);                            // the warning clears: settle on the normal clock
+    },
+  };
+}
+// The caption pill: settled form hides the caption text and shows
+// the chip (the mode tag + the first few words of the line).
+const pillChipEl = document.getElementById('pillChip');
+const chipWords = (t) => { const w = String(t).trim().split(/\s+/); return w.length > 4 ? w.slice(0, 4).join(' ') + '…' : t; };
+const pillCtl = makePopSettle((open) => demoPillEl.classList.toggle('settled', !open), 4000, 6000);
+function pillPoke(t) { if (!SMALL) return; pillChipEl.textContent = chipWords(t); pillCtl.poke(); }
+demoPillEl.addEventListener('click', () => { if (!demo.on) pillCtl.tap(); });   // during the demo the pill is the takeover surface (its pointerdown); in guide mode a tap works the chip
+// The readout: its settled form is the existing folded summary
+// (icon · speed · depth) and setForm rides the existing fold
+// switch, aria state included. It starts settled on phones (the
+// boot fold below agrees); startOpen=false because setReadoutFold
+// reads page consts that initialise later — the fold itself is
+// applied by the boot block, this only sets the bookkeeping.
+const readoutCtl = makePopSettle((open) => setReadoutFold(!open), 4000, 6000, false);
+// The scene panel keeps its manual fold; on a phone an objective
+// tick pulses the folded panel and flashes its Next line accent,
+// so the change is noticed without opening it.
+const scenePanelEl = document.getElementById('scene');
+let scenePopTimer = null;
+function scenePop() {
+  if (!SMALL) return;
+  scenePanelEl.classList.remove('popflash');
+  void scenePanelEl.offsetWidth;   // restart the animation if it was already running
+  scenePanelEl.classList.add('popflash');
+  if (scenePopTimer) clearTimeout(scenePopTimer);
+  scenePopTimer = setTimeout(() => scenePanelEl.classList.remove('popflash'), 1900);
+}
+
 const NARR_TARGETS = [null, BAYC, BAYC, POT, SPAWN, WRECK];
 const NARR_LABELS = ['cast off', 'Jamestown Bay', 'the shoal', 'the lost pot', 'home', 'the wreck'];
 const NARR_ARRIVALS = ['Cast off — underway.', 'Jamestown Bay — made it.', 'The shoal is worked. That is the drone discipline.',
@@ -1100,7 +1205,7 @@ function relWords(from, theta, to) {
 const friendlyDist = (m) => m < 950 ? `${Math.max(10, Math.round(m / 10) * 10)} metres` : `${(m / 1000).toFixed(1)} kilometres`;
 const pickLine = (arr, seed) => arr[((seed % arr.length) + arr.length) % arr.length];
 function narrate(OBJS, ni) {
-  if (demo.on) { setPillMode('demo'); return; }
+  if (demo.on) { setPillMode('demo'); pillCtl.setHold(false); return; }   // the demo's captions rule the pill; no guide-warning pin while the show runs
   setPillMode('guide');
   const bt = state.boat, d = state.drone;
   if (!narrPrevDone) narrPrevDone = OBJS.map(o => o[1]);
@@ -1127,13 +1232,13 @@ function narrate(OBJS, ni) {
     } else narrPingBand = null;
   } else narrPingBand = null;
   // the standing warning outranks events; events outrank guidance
-  let line = '';
+  let line = '', warnLine = false;
   if (state.vehicle === 'boat') {
     const bf = fwdOf(bt.theta);
     const keel = state.tide - groundAt(bt.pos.x + bf.x * 3.4, bt.pos.z + bf.z * 3.4);
-    if (keel < 0.6) line = 'Shoaling fast — less than a metre under the bow. Ease her off.';
-    else if (keel < 1.2) line = 'Shoaling — mind the keel, the bottom is rising.';
-    else if (bt.aground) line = 'Aground — reverse off her, gentle.';
+    if (keel < 0.6) { line = 'Shoaling fast — less than a metre under the bow. Ease her off.'; warnLine = true; }
+    else if (keel < 1.2) { line = 'Shoaling — mind the keel, the bottom is rising.'; warnLine = true; }
+    else if (bt.aground) { line = 'Aground — reverse off her, gentle.'; warnLine = true; }
   }
   if (!line && state.time < narrEventUntil) line = narrEvent;
   if (!line) {
@@ -1158,10 +1263,12 @@ function narrate(OBJS, ni) {
       }
     }
   }
+  pillCtl.setHold(warnLine);   // a keel/aground warning pins the pill open on phones while it holds; ordinary lines pop and settle
   if (line !== narrLine) {
     narrLine = line;
     demoCapEl.textContent = line;
     speak(line);
+    pillPoke(line);
   }
   demoPillEl.style.display = line ? 'block' : 'none';
 }
@@ -1173,6 +1280,7 @@ const sceneListEl = document.getElementById('sceneList');
 const sceneDebEl = document.getElementById('sceneDeb');
 const sceneNavEl = document.getElementById('sceneNav');
 let prevDone = [false, false, false, false, false, false];
+let prevWarnSig = '', prevNoteShown = '';   // pop-and-settle change detection for the readout (HUD tick)
 // Display latch for the objective list (see the HUD tick): an
 // objective once achieved stays shown achieved. Page-side only —
 // the mission rule still reads the raw conditions.
@@ -1312,8 +1420,18 @@ function animate() {
     if (noteT > 0 && note) html += `<br><span style="color:var(--accent)">${note}</span>`;
     readout.innerHTML = html;
     readoutSummary.innerHTML = state.vehicle === 'boat'
-      ? `🚤 <b>Boat</b> · depth under keel <b>${(state.tide - bot).toFixed(1)} m</b>` + (bt.aground ? ' · <span class="warn">⚠ AGROUND</span>' : '') + (F.takingWater ? ' · <span class="warn">TAKING WATER</span>' : '')
-      : `🤿 <b>Drone</b> · depth <b>${(state.tide - d.pos.y).toFixed(1)} m</b>` + (d.dead ? ' · <span class="warn">BATTERY SPENT</span>' : d.battery < 1 / 3 ? ' · <span class="warn">⚠ RESERVE</span>' : '') + (F.potFound ? ' · pot ✓ logged' : hDist(d.pos, POT) < 150 ? ` · pot ${Math.round(hDist(d.pos, POT))} m` : '');
+      ? `🚤 <b>Boat</b> · ${Math.abs(bt.speed * 1.944).toFixed(1)} kn · keel <b>${(state.tide - bot).toFixed(1)} m</b>` + (bt.aground ? ' · <span class="warn">⚠ AGROUND</span>' : '') + (F.takingWater ? ' · <span class="warn">TAKING WATER</span>' : '')
+      : `🤿 <b>Drone</b> · ${Math.hypot(d.vel.x, d.vel.y, d.vel.z).toFixed(1)} m/s · depth <b>${(state.tide - d.pos.y).toFixed(1)} m</b>` + (d.dead ? ' · <span class="warn">BATTERY SPENT</span>' : d.battery < 1 / 3 ? ' · <span class="warn">⚠ RESERVE</span>' : '') + (F.potFound ? ' · pot ✓ logged' : hDist(d.pos, POT) < 150 ? ` · pot ${Math.round(hDist(d.pos, POT))} m` : '');
+    // Pop-and-settle (phones): the readout is a live instrument, so
+    // "changed" means something worth surfacing — a warning state
+    // flipping (aground, taking water, drone dead or on its reserve
+    // third), a vehicle switch, or a fresh note landing in it. A
+    // live danger HOLDS it open; the full form is one tap away the
+    // rest of the time via the chip.
+    const warnSig = state.vehicle + (bt.aground ? 'A' : '') + (F.takingWater ? 'W' : '') + (d.dead ? 'D' : '') + (!d.aboard && d.battery < 1 / 3 ? 'R' : '');
+    readoutCtl.setHold(warnSig.length > 1);
+    if (warnSig !== prevWarnSig) { prevWarnSig = warnSig; readoutCtl.poke(); }
+    if (noteT > 0 && note) { if (note !== prevNoteShown) { prevNoteShown = note; readoutCtl.poke(); } } else prevNoteShown = '';
     drawMinichart(vehPos);
     // Scene 1 — a job of work: the Marigold's lost pot
     const OBJS = [
@@ -1334,7 +1452,7 @@ function animate() {
     const ni = [0, 1, 2, 3, 4, 5].find(i => !objLatch[i]);
     sceneListEl.innerHTML = OBJS.map(([txt], i) =>
       `<div class="obj ${objLatch[i] ? 'done' : i === ni ? 'active' : ''}">${objLatch[i] ? '✓' : i === ni ? '▸' : '○'} ${txt}</div>`).join('');
-    OBJS.forEach(([txt, done], i) => { if (done && !prevDone[i]) flashNote('✓ ' + txt.split(' — ')[0]); prevDone[i] = done; });
+    OBJS.forEach(([txt, done], i) => { if (done && !prevDone[i]) { flashNote('✓ ' + txt.split(' — ')[0]); scenePop(); } prevDone[i] = done; });
     const NAVT = [[null, 'cast off — the bay lies east'], [BAYC, 'Jamestown Bay'], [BAYC, 'the shoal — Jamestown Bay'], [POT, 'the pot — follow the pinger'], [SPAWN, 'home — Western Anchorage'], [WRECK, 'the wreck cove']];
     const coreDone = [0, 1, 2, 3, 4].every(i => OBJS[i][1]);
     if (ni === undefined) sceneNavEl.textContent = 'Scene complete.';
@@ -1431,7 +1549,7 @@ function setTideFold(folded) { vehiclesPanel.classList.toggle('tideFolded', fold
 function setReadoutFold(folded) { readoutPanel.classList.toggle('folded', folded); readoutPanel.setAttribute('aria-expanded', String(!folded)); }
 document.getElementById('sceneHead').addEventListener('click', () => setSceneFold(!scenePanel.classList.contains('folded')));
 tideToggleBtn.addEventListener('click', () => setTideFold(!vehiclesPanel.classList.contains('tideFolded')));
-readoutPanel.addEventListener('click', () => setReadoutFold(!readoutPanel.classList.contains('folded')));
+readoutPanel.addEventListener('click', () => { if (SMALL) readoutCtl.tap(); else setReadoutFold(!readoutPanel.classList.contains('folded')); });   // phones: the tap works the chip (pop-and-settle); wide screens keep the plain manual fold
 if (matchMedia('(max-width: 700px)').matches) {   // narrow screens start decluttered; wide screens stay expanded
   setSceneFold(true); setTideFold(true); setReadoutFold(true);
 }
