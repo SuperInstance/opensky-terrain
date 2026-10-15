@@ -145,10 +145,23 @@ window.__bootOk = function () {
 var BOOT_MSG = 'The game did not finish loading — a file may have been interrupted, or an old copy may be cached on this device.';
 window.addEventListener('error', function (e) {
   if (e && e.target && e.target !== window && e.target !== document) return;   // resource noise, not a boot failure
+  if (!(e && (e.message || e.error))) return;   // a script exception always carries a message; a message-less window event is noise, not a dead boot
   if (!window.__booted) window.__bootFail(BOOT_MSG);
 }, true);
-window.addEventListener('unhandledrejection', function () {
-  if (!window.__booted) window.__bootFail(BOOT_MSG);
+window.addEventListener('unhandledrejection', function (e) {
+  // Only a rejection the boot path itself marked critical may raise
+  // the panel (the module tags its boot-path errors __bootCritical
+  // before rethrowing them). Everything else — the fire-and-forget
+  // scenery loads (harbor kit, traffic boats, the far-view skirt),
+  // library internals, anything unmarked — is recorded and NEVER
+  // panels: a missing building must not read as a dead game while
+  // boot is progressing fine. Boot awaits that matter are awaited
+  // inside the module's own try/catch, which calls __bootFail
+  // directly; this listener is the belt to that braces, and an
+  // unmarked rejection is by definition not one of them.
+  var r = e && e.reason;
+  if (r && r.__bootCritical) { if (!window.__booted) window.__bootFail(BOOT_MSG); return; }
+  if (window.console && console.warn) console.warn('[shoalwater] non-critical rejection (scenery or library, boot unaffected):', r);
 });
 window.__bootTimer = setInterval(function () {
   if (!window.__booted && performance.now() - window.__bootProgress > 20000) window.__bootFail(BOOT_MSG);
@@ -214,12 +227,12 @@ import * as THREE from 'three';
 // BUMP RULE: raise the stamp on EVERY deploy that changes any file
 // in the graph (explore.html, qm.js, core.js, demo.js), all edges
 // together, and keep demo.js's core.js stamp in step.
-import { decodeQuantizedMeshTile } from './qm.js?v=2026-10-14.6';
+import { decodeQuantizedMeshTile } from './qm.js?v=2026-10-14.7';
 // The simulation core is shared with the headless tools (M0 extraction):
 // same physics in the page and in Node. Anchors come from the core so
 // the page, the sim and the coach runtime can never drift apart.
-import { createPack, gridFromTile, createGame, SPAWN, BAYC, WRECK, POT, STEP } from './core.js?v=2026-10-14.6';
-import { createDemo } from './demo.js?v=2026-10-14.6';
+import { createPack, gridFromTile, createGame, SPAWN, BAYC, WRECK, POT, STEP } from './core.js?v=2026-10-14.7';
+import { createDemo } from './demo.js?v=2026-10-14.7';
 
 // Boot watchdog plumbing (the watchdog itself is the inline script
 // above): failures on the boot path become an honest panel instead
@@ -227,6 +240,11 @@ import { createDemo } from './demo.js?v=2026-10-14.6';
 // load from being mistaken for a hung one.
 const bootFail = (msg) => { if (window.__bootFail) window.__bootFail(msg); };
 const bootProgress = () => { window.__bootProgress = performance.now(); };
+// Tag a boot-path error critical before it is rethrown: if it ever
+// surfaces as an unhandled rejection, the watchdog may panel on it.
+// Unmarked rejections never panel (see the watchdog's listener).
+const bootCritical = (err) => { if (err && typeof err === 'object') err.__bootCritical = true; return err; };
+bootProgress();   // the module graph linked and is evaluating — a boot milestone; the 20 s stall window measures from here, not from HTML parse
 
 const FM = 1.8288;
 const PACK = new URLSearchParams(location.search).get('pack') === 'demo' ? 'demo-pack' : 'real-pack';
@@ -248,7 +266,7 @@ const fetchRetry = async (url, asBuf) => {
 };
 let index;
 try { index = await fetchRetry(PACK + '/tiles-index.json'); }
-catch (err) { bootFail('The chart index did not load — check your connection, then retry for a fresh copy.'); throw err; }
+catch (err) { bootFail('The chart index did not load — check your connection, then retry for a fresh copy.'); throw bootCritical(err); }
 bootProgress();
 const levels = [...new Set(index.tiles.map(e => e.z))].sort((a, b) => a - b);
 let useZ = levels[levels.length - 1];
@@ -280,7 +298,7 @@ await Promise.all(entries.map(async (e, i) => {
 }));
 } catch (err) {
   bootFail('A terrain tile failed to load — check your connection, then retry for a fresh copy.');
-  throw err;
+  throw bootCritical(err);
 }
 // The pack samples through the core's O(1) grid index now (the page's
 // old linear tile scan is gone); values are identical.
@@ -295,11 +313,11 @@ const stage = document.getElementById('stage');
 const glProbe = document.createElement('canvas');
 if (!(glProbe.getContext('webgl2') || glProbe.getContext('webgl'))) {
   bootFail('This browser could not start WebGL, which the chart needs in order to draw. A current Chrome or Safari should fix it.');
-  throw new Error('WebGL unavailable');
+  throw bootCritical(new Error('WebGL unavailable'));
 }
 let renderer;
 try { renderer = new THREE.WebGLRenderer({ antialias: true }); }
-catch (err) { bootFail('This browser could not start WebGL, which the chart needs in order to draw. A current Chrome or Safari should fix it.'); throw err; }
+catch (err) { bootFail('This browser could not start WebGL, which the chart needs in order to draw. A current Chrome or Safari should fix it.'); throw bootCritical(err); }
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));   // capped at 1.5 (was 2): on a high-DPR screen the old cap shaded ~1.8x the fragments of this one, for little visible gain at this scene's scale — the cap is real headroom on weak GPUs, at a slight softening on retina
 renderer.setSize(innerWidth, innerHeight);
 stage.appendChild(renderer.domElement);
@@ -401,7 +419,7 @@ const hDist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
       pm.setMatrixAt(i, m4);
     });
     pm.instanceMatrix.needsUpdate = true; scene.add(pm);
-  }).catch(() => {});
+  }).catch((e) => console.warn('[shoalwater] harbor kit unavailable (scenery only, game unaffected):', e));
   fetch('boats.json').then(r => r.json()).then(list => {
     const hullGeo = new THREE.BoxGeometry(2.2, 1.0, 6.6); hullGeo.translate(0, 0.1, 0);
     const cabGeo = new THREE.BoxGeometry(1.6, 1.0, 2.2); cabGeo.translate(0, 1.05, 0.3);
@@ -417,7 +435,7 @@ const hDist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
     });
     hm.instanceMatrix.needsUpdate = true; cm.instanceMatrix.needsUpdate = true;
     scene.add(hm); scene.add(cm); tideFollowers.push(hm, cm);
-  }).catch(() => {});
+  }).catch((e) => console.warn('[shoalwater] traffic boats unavailable (scenery only, game unaffected):', e));
   // the wreck in the cove — a placed dive target, from local knowledge; to be surveyed
   const wreck = new THREE.Group();
   const rust = new THREE.MeshStandardMaterial({ color: 0x4a382c, roughness: 1 });
@@ -1004,7 +1022,7 @@ function loadFarView() {
     }
     buildWater(u.minX, u.maxX, u.minY, u.maxY, water.position.y);
     window.__farTiles = built.length;
-  }).catch(() => {});
+  }).catch((e) => console.warn('[shoalwater] far view unavailable (scenery only, game unaffected):', e));
 }
 
 // ---------- additions: time, poles, the local guide ----------
