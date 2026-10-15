@@ -9,7 +9,7 @@
 // its precondition and refuses where the water isn't there.
 import { BAYC, WRECK, clamp, fwdOf, hDist } from '../core.js';
 
-const wrapPi = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+const wrapPi = (a) => { if (!Number.isFinite(a)) return 0; while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
 // the boat's real speed under demoBoatTo's throttle mapping for a
 // requested speed — used for ETAs and timeouts
 export const shapedSpeed = (speed) => {

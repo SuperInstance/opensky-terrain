@@ -27,7 +27,7 @@
   button.active{ background:var(--accent); color:#1a1206; border-color:var(--accent); font-weight:650; }
   #vehicles label{ font-size:11px; color:var(--dim); display:flex; justify-content:space-between; gap:8px; }
   #vehicles input[type=range]{ width:150px; accent-color:var(--accent); }
-  #readout{ left:16px; bottom:16px; font-variant-numeric:tabular-nums; font-size:13.5px; line-height:1.65; min-width:230px; }
+  #readout{ left:16px; bottom:calc(16px + env(safe-area-inset-bottom, 0px)); font-variant-numeric:tabular-nums; font-size:13.5px; line-height:1.65; min-width:230px; }
   #readout b{ color:var(--accent); font-weight:650; }
   #scene{ top:118px; left:16px; font-size:12.5px; line-height:1.75; min-width:250px; max-width:300px; }
   #scene h3{ margin:0 0 2px; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:650; }
@@ -40,6 +40,8 @@
   #help b{ color:var(--ink); font-weight:600; }
   #loading{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
     background:#07222f; z-index:40; font-size:15px; color:var(--dim); }
+  #loading .bootBox{ max-width:min(430px,92vw); text-align:center; line-height:1.55; padding:0 18px; }
+  #loading .bootBox button{ margin-top:14px; }
   #stick{ position:fixed; left:18px; bottom:96px; width:128px; height:128px; border-radius:50%;
     border:1.5px solid rgba(255,255,255,.35); background:rgba(255,255,255,.06); z-index:20; display:none; }
   #stickKnob{ position:absolute; width:54px; height:54px; border-radius:50%; background:rgba(255,255,255,.35);
@@ -52,7 +54,8 @@
   /* the debrief: the finish lands as a card, not a line in a
      corner panel — it stays until the player dismisses it */
   #debrief{ position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:35;
-    display:none; width:min(430px,92vw); text-align:center; padding:20px 24px 16px;
+    display:none; width:min(430px,92vw); max-height:92dvh; overflow-y:auto; touch-action:auto;
+    overscroll-behavior:contain; text-align:center; padding:20px 24px 16px;
     border:1px solid var(--accent); border-radius:14px; background:rgba(8,24,36,.94);
     box-shadow:0 12px 44px rgba(0,0,0,.5); }
   #debrief.show{ display:block; }
@@ -64,12 +67,12 @@
   #debriefBtn{ margin-top:10px; }
   /* time acceleration: a clock setting, not a controller setting —
      the same fixed 1/60 steps, more of them per frame */
-  #timeCtl{ position:fixed; left:50%; transform:translateX(-50%); bottom:14px; z-index:25;
+  #timeCtl{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(14px + env(safe-area-inset-bottom, 0px)); z-index:25;
     display:flex; gap:2px; align-items:center; padding:6px 8px; }
   #timeCtl .tcLabel{ font-size:11px; color:var(--dim); letter-spacing:.14em; text-transform:uppercase; margin-right:4px; }
   #timeCtl button{ padding:6px 11px; font-variant-numeric:tabular-nums; }
   #timeCtl button.active{ background:var(--accent); color:#1a1206; border-color:var(--accent); font-weight:650; }
-  #minichart{ position:fixed; right:14px; bottom:16px; width:148px; height:148px; z-index:15;
+  #minichart{ position:fixed; right:14px; bottom:calc(16px + env(safe-area-inset-bottom, 0px)); width:148px; height:148px; z-index:15;
     border:1px solid rgba(255,255,255,.25); border-radius:10px; background:#0b2a3a; cursor:pointer; }
   #help{ bottom:176px; }
   #vehicles button{ padding:10px 14px; }
@@ -94,13 +97,63 @@
   #readout.folded #readoutSummary{ display:block; }
   #readout.folded #readoutBody{ display:none; }
   @media (max-width:700px){ #help{ display:none; } .title .sub{ display:none; } .title h1{ font-size:16px; }
-    #scene{ top:82px; min-width:0; max-width:calc(100vw - 232px); } #readout{ min-width:0; max-width:calc(100vw - 32px); }
-    .tideToggle{ min-height:40px; } #stick{ bottom:204px; } #vertBtns{ bottom:216px; } }
+    #scene{ top:82px; min-width:0; max-width:calc(100vw - 232px); } #readout{ min-width:0; max-width:calc(100vw - 178px); }
+    .tideToggle{ min-height:40px; } #stick{ bottom:204px; } #vertBtns{ bottom:216px; }
+    #readout.folded #readoutSummary{ white-space:normal; } }
 </style>
 </head>
 <body>
 <div id="stage"></div>
 <div id="loading">loading Region Pack tiles…</div>
+<script>
+// Boot watchdog. This page is an ES-module graph (this document plus
+// qm.js / core.js / demo.js, and three.js from a CDN) booting behind
+// the loading veil above. If any piece fails to arrive — an
+// interrupted download, a CDN stall, no WebGL, or a TORN CACHE (the
+// phone keeps an old copy of one file beside a new copy of another,
+// and the graph no longer links) — module evaluation dies silently
+// and the veil would sit forever, indistinguishable from a hung app.
+// The watchdog tracks boot PROGRESS: the module stamps
+// window.__bootProgress as work lands. If the app has not reached
+// interactive and no progress has been made for 20 s, the veil
+// becomes an honest failure panel with a retry that reloads under a
+// fresh URL, past the document cache. (Module files carry their own
+// ?v= stamps — see the module script — so a torn graph cannot
+// survive the next deploy, and this panel covers the wait.)
+window.__booted = false;
+window.__bootProgress = performance.now();
+window.__bootFail = function (msg) {
+  if (window.__booted) return;
+  var el = document.getElementById('loading');
+  if (!el || el.dataset.failed) return;
+  el.dataset.failed = '1';
+  el.innerHTML = '';
+  var box = document.createElement('div'); box.className = 'bootBox';
+  var p = document.createElement('p'); p.textContent = msg; box.appendChild(p);
+  var b = document.createElement('button'); b.type = 'button'; b.textContent = 'Retry with a fresh copy';
+  b.addEventListener('click', function () {
+    var u = new URL(location.href);
+    u.searchParams.set('fresh', String(Date.now()));
+    location.replace(u.toString());
+  });
+  box.appendChild(b); el.appendChild(box); el.style.display = 'flex';
+};
+window.__bootOk = function () {
+  window.__booted = true;
+  if (window.__bootTimer) { clearInterval(window.__bootTimer); window.__bootTimer = null; }
+};
+var BOOT_MSG = 'The game did not finish loading — a file may have been interrupted, or an old copy may be cached on this device.';
+window.addEventListener('error', function (e) {
+  if (e && e.target && e.target !== window && e.target !== document) return;   // resource noise, not a boot failure
+  if (!window.__booted) window.__bootFail(BOOT_MSG);
+}, true);
+window.addEventListener('unhandledrejection', function () {
+  if (!window.__booted) window.__bootFail(BOOT_MSG);
+});
+window.__bootTimer = setInterval(function () {
+  if (!window.__booted && performance.now() - window.__bootProgress > 20000) window.__bootFail(BOOT_MSG);
+}, 1000);
+</script>
 
 <div class="hud title">
   <div class="kicker">SuperInstance · Shoalwater · Open Sitka Sound</div>
@@ -147,12 +200,33 @@
 </script>
 <script type="module">
 import * as THREE from 'three';
-import { decodeQuantizedMeshTile } from './qm.js';
+// MODULE GRAPH VERSION — every local module in this page's graph
+// (qm.js, core.js, demo.js, and demo.js's own import of core.js)
+// carries the same ?v= stamp. GitHub Pages serves these files with a
+// short cache TTL but no per-deploy invalidation, so a device can
+// hold a STALE copy of one module beside a FRESH copy of another;
+// the torn graph then fails to link and the page dies silently
+// behind the loading veil (seen 2026-10-14: worked in the afternoon,
+// dead in the evening, fine on every fresh-profile test rig).
+// Stamping every intra-graph edge with one version makes the graph
+// atomic: any cached piece pulls its own generation of the rest, so
+// the worst case is last deploy's working build, never a dead page.
+// BUMP RULE: raise the stamp on EVERY deploy that changes any file
+// in the graph (explore.html, qm.js, core.js, demo.js), all edges
+// together, and keep demo.js's core.js stamp in step.
+import { decodeQuantizedMeshTile } from './qm.js?v=2026-10-14.6';
 // The simulation core is shared with the headless tools (M0 extraction):
 // same physics in the page and in Node. Anchors come from the core so
 // the page, the sim and the coach runtime can never drift apart.
-import { createPack, gridFromTile, createGame, SPAWN, BAYC, WRECK, POT, STEP } from './core.js';
-import { createDemo } from './demo.js';
+import { createPack, gridFromTile, createGame, SPAWN, BAYC, WRECK, POT, STEP } from './core.js?v=2026-10-14.6';
+import { createDemo } from './demo.js?v=2026-10-14.6';
+
+// Boot watchdog plumbing (the watchdog itself is the inline script
+// above): failures on the boot path become an honest panel instead
+// of a silent dead veil, and progress stamps keep a merely-slow
+// load from being mistaken for a hung one.
+const bootFail = (msg) => { if (window.__bootFail) window.__bootFail(msg); };
+const bootProgress = () => { window.__bootProgress = performance.now(); };
 
 const FM = 1.8288;
 const PACK = new URLSearchParams(location.search).get('pack') === 'demo' ? 'demo-pack' : 'real-pack';
@@ -172,7 +246,10 @@ const fetchRetry = async (url, asBuf) => {
   }
   throw new Error('failed: ' + url);
 };
-const index = await fetchRetry(PACK + '/tiles-index.json');
+let index;
+try { index = await fetchRetry(PACK + '/tiles-index.json'); }
+catch (err) { bootFail('The chart index did not load — check your connection, then retry for a fresh copy.'); throw err; }
+bootProgress();
 const levels = [...new Set(index.tiles.map(e => e.z))].sort((a, b) => a - b);
 let useZ = levels[levels.length - 1];
 while (index.tiles.filter(e => e.z === useZ).length > 120 && useZ > levels[0]) useZ--;
@@ -183,15 +260,26 @@ const extent = {
 };
 const tileGrids = [];   // aligned with entries: core-built lattices
 const sceneTiles = [];
+const loadEl = document.getElementById('loading');
+let tilesDone = 0;
 try {
 await Promise.all(entries.map(async (e, i) => {
   const buf = await fetchRetry(`${PACK}/tiles/${e.z}/${e.x}/${e.y}.terrain`, true);
   const d = decodeQuantizedMeshTile(buf);
   tileGrids[i] = gridFromTile(d, e);   // the core's lattice builder (hole fill included)
   sceneTiles.push({ e, d });
+  // Boot is real CPU (decode + lattice + hole fill per tile) done
+  // behind the veil: report progress, stamp the watchdog, and YIELD
+  // a turn per tile so the veil can paint and the renderer stays
+  // responsive on a weak client instead of blocking first paint in
+  // one long task that reads as a hung tab.
+  tilesDone++;
+  bootProgress();
+  if (!loadEl.dataset.failed) loadEl.textContent = `loading Region Pack tiles… ${tilesDone}/${entries.length}`;
+  await new Promise(r => setTimeout(r, 0));
 }));
 } catch (err) {
-  document.getElementById('loading').textContent = 'A terrain tile failed to load — check your connection and reload the page.';
+  bootFail('A terrain tile failed to load — check your connection, then retry for a fresh copy.');
   throw err;
 }
 // The pack samples through the core's O(1) grid index now (the page's
@@ -201,7 +289,17 @@ const sampleBottom = (x, yEnu) => pack.sampleBottom(x, yEnu);
 
 // ---------- scene ----------
 const stage = document.getElementById('stage');
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+// WebGL is the one hard device requirement (three r183 needs WebGL2;
+// WebGL1 accepted for the probe's sake) — name it honestly instead
+// of dying as a black screen behind the veil.
+const glProbe = document.createElement('canvas');
+if (!(glProbe.getContext('webgl2') || glProbe.getContext('webgl'))) {
+  bootFail('This browser could not start WebGL, which the chart needs in order to draw. A current Chrome or Safari should fix it.');
+  throw new Error('WebGL unavailable');
+}
+let renderer;
+try { renderer = new THREE.WebGLRenderer({ antialias: true }); }
+catch (err) { bootFail('This browser could not start WebGL, which the chart needs in order to draw. A current Chrome or Safari should fix it.'); throw err; }
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));   // capped at 1.5 (was 2): on a high-DPR screen the old cap shaded ~1.8x the fragments of this one, for little visible gain at this scene's scale — the cap is real headroom on weak GPUs, at a slight softening on retina
 renderer.setSize(innerWidth, innerHeight);
 stage.appendChild(renderer.domElement);
@@ -1323,6 +1421,7 @@ if (matchMedia('(max-width: 700px)').matches) {   // narrow screens start declut
 if (new URLSearchParams(location.search).get('demo') === '1') demoSuppress = false;
 setTimeout(() => { if (!userTouched && !demoSuppress) startDemo(); }, 2600);   // fresh eyes get the show, hands off
 buildMinichart();
+if (window.__bootOk) window.__bootOk();   // interactive: stand the watchdog down
 document.getElementById('loading').style.display = 'none';
 animate();
 loadFarView();

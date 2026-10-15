@@ -24,10 +24,10 @@
 // tried and measured worse: the drain is per-second, so a slow
 // leg costs more per metre, not less.)
 
-import { SPAWN, POT, WRECK } from './core.js';
+import { SPAWN, POT, WRECK } from './core.js?v=2026-10-14.6';   // ?v= = the page's module-graph stamp; keep in step with explore.html (see the bump rule there)
 
 const clamp = (v, lo, hi) => v < lo ? lo : v > hi ? hi : v;
-export function wrapPi(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
+export function wrapPi(a) { if (!Number.isFinite(a)) return 0; while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
 const fwdOf = (th) => ({ x: -Math.sin(th), z: -Math.cos(th) });
 
 // Steer the boat toward (x, z) at the given target speed.
